@@ -18,6 +18,9 @@
     <label for="listened_date">Dato (YYYY-MM-DD)</label> <!-- Etikett for dato -->
     <input id="listened_date" name="listened_date" type="date" required /> <!-- Dato-input (sender YYYY-MM-DD) -->
 
+    <label for="nationality">Nasjonalitet</label> <!-- Etikett for nasjonalitet -->
+    <input id="nationality" name="nationality" type="text" required /> <!-- Tekstfelt for nasjonalitet (påkrevd) -->
+
     <button type="submit">Lagre sang</button> <!-- Sendeknapp for skjemaet -->
   </form> <!-- Slutt på skjema -->
   <p class="muted">Dato lagres i format YYYY-MM-DD.</p> <!-- Hjelpetekst til brukeren -->
@@ -33,6 +36,7 @@
       <li> <!-- Starter listeelement -->
         <strong><%= s.title %></strong> av <em><%= s.artist %></em> <!-- Viser tittel og artist trygt -->
         <span class="muted">— <%= s.listened_date %></span> <!-- Viser dato trygt -->
+        <span class="muted">— <%= s.nationality %></span> <!-- Viser nasjonalitet trygt -->
       </li> <!-- Slutt på listeelement -->
     <% } %> <!-- Slutt på løkke -->
   </ul> <!-- Slutt på liste -->

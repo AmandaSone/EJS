@@ -23,8 +23,9 @@ db.serialize(() => { // Sørger for at SQL-kommandoer kjører i rekkefølge
       id INTEGER PRIMARY KEY AUTOINCREMENT,          -- Primærnøkkel som øker automatisk
       title TEXT NOT NULL,                           -- Sangtittel (påkrevd)
       artist TEXT NOT NULL,                          -- Artistnavn (påkrevd)
-      listened_date TEXT NOT NULL                    -- Dato i format YYYY-MM-DD (påkrevd)
-    )                                                -- Slutt på CREATE TABLE
+      listened_date TEXT NOT NULL,                   -- Dato i format YYYY-MM-DD (påkrevd)
+      nationality TEXT NOT NULL                      -- Nasjonalitet (påkrevd)
+)                                                -- Slutt på CREATE TABLE
   `); // Avslutter kjøringen av SQL-setningen
 }); // Avslutter serialize-blokk
 
@@ -64,7 +65,7 @@ function dbRun(sql, params = []) { // Definerer en funksjon for å kjøre skrive
 app.get('/', async (req, res) => { // Definerer rute for å vise startsiden
   try { // Starter try/catch for feilhandtering
     const songs = await dbAll( // Henter alle sanger fra databasen
-      'SELECT id, title, artist, listened_date FROM songs ORDER BY listened_date DESC, id DESC', // SQL for å liste sanger
+      'SELECT id, title, artist, listened_date, nationality FROM songs ORDER BY listened_date DESC, id DESC', // SQL for å liste sanger
       [] // Ingen parametere for denne spørringen
     ); // Avslutter henting av sanger
     res.render('index', { title: 'Registrer sanger', songs, message: null }); // Renderer index.ejs med data
@@ -77,23 +78,23 @@ app.get('/', async (req, res) => { // Definerer rute for å vise startsiden
 // POST /songs - validerer og lagrer en ny sang i databasen
 app.post('/songs', async (req, res) => { // Definerer rute for innsending av nytt sangskjema
   try { // Starter try/catch for å håndtere feil
-    const { title, artist, listened_date } = req.body; // Leser ut feltene fra skjemaet
-    if (!title || !artist || !listened_date) { // Sjekker at alle felt er utfylt
-      const songs = await dbAll('SELECT id, title, artist, listened_date FROM songs ORDER BY listened_date DESC, id DESC'); // Henter liste for visning ved feil
-      return res.status(400).render('index', { title: 'Registrer sanger', songs, message: 'Fyll ut tittel, artist og dato.' }); // Viser feilmelding
+    const { title, artist, listened_date, nationality } = req.body; // Leser ut feltene fra skjemaet
+    if (!title || !artist || !listened_date || !nationality) { // Sjekker at alle felt er utfylt
+      const songs = await dbAll('SELECT id, title, artist, listened_date, nationality FROM songs ORDER BY listened_date DESC, id DESC'); // Henter liste for visning ved feil
+      return res.status(400).render('index', { title: 'Registrer sanger', songs, message: 'Fyll ut tittel, artist, dato og nasjonalitet.' }); // Viser feilmelding
     } // Avslutter validering for tomme felt
     if (!/^\d{4}-\d{2}-\d{2}$/.test(listened_date)) { // Sjekker at dato har format YYYY-MM-DD
-      const songs = await dbAll('SELECT id, title, artist, listened_date FROM songs ORDER BY listened_date DESC, id DESC'); // Henter liste for visning ved feil
+      const songs = await dbAll('SELECT id, title, artist, listened_date, nationality FROM songs ORDER BY listened_date DESC, id DESC'); // Henter liste for visning ved feil
       return res.status(400).render('index', { title: 'Registrer sanger', songs, message: 'Dato må være i format YYYY-MM-DD.' }); // Viser feilmelding om datoformat
     } // Avslutter datoformat-sjekk
     await dbRun( // Kjører INSERT for å lagre sangen
-      'INSERT INTO songs (title, artist, listened_date) VALUES (?, ?, ?)', // SQL med parametere
-      [title.trim(), artist.trim(), listened_date] // Verdier å sette inn (trim fjerner ekstra mellomrom)
+      'INSERT INTO songs (title, artist, listened_date, nationality) VALUES (?, ?, ?, ?)', // SQL med parametere
+      [title.trim(), artist.trim(), listened_date, nationality.trim()] // Verdier å sette inn (trim fjerner ekstra mellomrom)
     ); // Avslutter INSERT
     res.redirect('/'); // Sender brukeren tilbake til forsiden for å se oppdatert liste
   } catch (err) { // Fanger uventede feil
     console.error(err); // Logger feilen
-    const songs = await dbAll('SELECT id, title, artist, listened_date FROM songs ORDER BY listened_date DESC, id DESC'); // Henter liste for visning ved feil
+    const songs = await dbAll('SELECT id, title, artist, listened_date, nationality FROM songs ORDER BY listened_date DESC, id DESC'); // Henter liste for visning ved feil
     res.status(500).render('index', { title: 'Registrer sanger', songs, message: 'Kunne ikke lagre sangen.' }); // Viser generell feilmelding
   } // Avslutter try/catch
 }); // Avslutter POST-ruten
