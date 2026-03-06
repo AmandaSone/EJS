@@ -1,0 +1,15 @@
+<!DOCTYPE html> <!-- Angir at dokumentet er HTML5 -->
+<html lang="no"> <!-- Setter språk til norsk -->
+<head> <!-- Starter head-seksjonen -->
+  <meta charset="UTF-8" /> <!-- Bruker UTF-8 for norske tegn -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" /> <!-- Gjør siden responsiv på mobil -->
+  <title><%= title %></title> <!-- Setter side-tittel dynamisk fra serveren -->
+  <link rel="stylesheet" href="/styles.css" /> <!-- Kobler til ekstern CSS fra /public -->
+</head> <!-- Slutt på head -->
+<body> <!-- Starter body-innhold -->
+  <header class="site-header"> <!-- Toppseksjon -->
+    <nav class="nav"> <!-- Navigasjonslinje -->
+      <a href="/" class="brand">Vår Sangregister</a> <!-- Lenke/brand til forsiden -->
+    </nav> <!-- Slutt på nav -->
+  </header> <!-- Slutt på header -->
+  <main class="container"> <!-- Starter hovedinnhold (lukkes i footer-partial) -->

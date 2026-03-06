@@ -1,0 +1,92 @@
+/* Grunnstil for hele siden */ 
+body { /* Body-elementet */
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; /* Lesbar fontfamilie */
+  margin: 0; /* Fjerner standard margin */
+  padding: 0; /* Fjerner standard padding */
+  background: #f6f7fb; /* Lys bakgrunnsfarge */
+  color: #222; /* Mørk tekst for god kontrast */
+}
+
+/* Toppnavigasjon */
+.site-header { /* Header-område */
+  background: white; /* Hvit bakgrunn */
+  border-bottom: 1px solid #e5e7eb; /* Tynn bunnramme */
+  padding: 12px 16px; /* Indre luft */
+}
+
+/* Nav-bar layout */
+.nav { /* Navigasjonscontainer */
+  display: flex; /* Bruker flex-layout */
+  align-items: center; /* Sentrerer vertikalt */
+  justify-content: space-between; /* Plasserer elementer i hver sin ende */
+}
+
+/* Brand/lenke-stil */
+.brand { /* Logo/brand-lenken */
+  font-weight: 700; /* Fet skrift */
+  color: #0f766e; /* Teal-farge */
+  text-decoration: none; /* Ingen understrek */
+}
+
+/* Container for innhold */
+.container { /* Hovedinnpakning */
+  max-width: 800px; /* Begrenset bredde for lesbarhet */
+  margin: 24px auto; /* Sentrer og legg til topp/bunn-margin */
+  padding: 0 16px; /* Litt sidepadding */
+}
+
+/* Kort-komponent */
+.card { /* Panel med kant og bakgrunn */
+  background: white; /* Hvit bakgrunn */
+  border: 1px solid #e5e7eb; /* Lys kant */
+  border-radius: 8px; /* Runde hjørner */
+  padding: 16px; /* Indre luft */
+  margin-bottom: 16px; /* Avstand under */
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04); /* Lett skygge */
+}
+
+/* Skjemalayout */
+.form { /* Wrapper for skjema */
+  display: grid; /* Bruker grid-layout */
+  gap: 8px; /* Avstand mellom felter */
+}
+
+/* Input-felt */
+input { /* Tekst- og dato-inputs */
+  padding: 10px; /* Indre luft for klikkflate */
+  border: 1px solid #cbd5e1; /* Lys grå kant */
+  border-radius: 6px; /* Runde hjørner */
+  font-size: 16px; /* Lesbar skriftstørrelse */
+}
+
+/* Knapper */
+button { /* Generell knappestil */
+  background: #0ea5e9; /* Blå bakgrunn */
+  color: white; /* Hvit tekst */
+  border: none; /* Ingen kantlinje */
+  border-radius: 6px; /* Runde hjørner */
+  padding: 10px 14px; /* Indre luft */
+  font-size: 16px; /* Lesbar skriftstørrelse */
+  cursor: pointer; /* Pekehånd ved hover */
+}
+
+/* Hover-effekt for knapp */
+button:hover { /* Når musen er over knappen */
+  background: #0284c7; /* Litt mørkere blå */
+}
+
+/* Meldingsboks */
+.notice { /* Stil for informasjons-/feilmeldinger */
+  background: #ecfeff; /* Lys blå bakgrunn */
+  border: 1px solid #bae6fd; /* Lys blå kantlinje */
+  color: #0c4a6e; /* Mørk blå tekst */
+  padding: 10px; /* Indre luft */
+  border-radius: 6px; /* Runde hjørner */
+  margin: 12px 0; /* Avstand over og under */
+}
+
+/* Dempet hjelpetekst */
+.muted { /* Mindre fremhevet tekst */
+  color: #555; /* Grå farge */
+  font-size: 14px; /* Litt mindre størrelse */
+}

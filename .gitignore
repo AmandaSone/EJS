@@ -1,0 +1,32 @@
+# Node-pakker (skal ikke versjoneres – installeres via npm install)
+node_modules/
+
+# Loggfiler (lokale feillogger)
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Lokale miljøvariabler/hemmeligheter (hvis du senere bruker .env)
+.env
+.env.*
+
+# SQLite-databaser og backup-filer (genererte data – skal ikke i repo)
+app.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Bygge-/test-output (hvis du senere bruker bygg/verktøy)
+dist/
+build/
+coverage/
+.cache/
+
+# OS-spesifikke søppelfiler
+.DS_Store
+Thumbs.db
+
+# Redaktør-/IDE-filer (valgfritt å ignorere – ryddig i repo)
+.vscode/

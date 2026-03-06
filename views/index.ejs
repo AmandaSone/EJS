@@ -1,0 +1,41 @@
+<%- include('partials/header') %> <!-- Inkluderer header-partialen (uten escaping) -->
+
+<h1><%= title %></h1> <!-- Viser sidetittel trygt -->
+
+<% if (typeof message !== 'undefined' && message) { %> <!-- Hvis serveren har sendt en melding -->
+  <div class="notice"><%= message %></div> <!-- Viser meldingen i en meldingsboks -->
+<% } %> <!-- Slutt på melding-sjekk -->
+
+<section class="card"> <!-- Kort med skjema for å legge til sang -->
+  <h2>Legg til sang</h2> <!-- Seksjonstittel -->
+  <form action="/songs" method="POST" class="form"> <!-- Skjema som sender POST til /songs -->
+    <label for="title">Sangtittel</label> <!-- Etikett for tittel -->
+    <input id="title" name="title" type="text" required /> <!-- Tekstfelt for tittel (påkrevd) -->
+
+    <label for="artist">Artist</label> <!-- Etikett for artist -->
+    <input id="artist" name="artist" type="text" required /> <!-- Tekstfelt for artist (påkrevd) -->
+
+    <label for="listened_date">Dato (YYYY-MM-DD)</label> <!-- Etikett for dato -->
+    <input id="listened_date" name="listened_date" type="date" required /> <!-- Dato-input (sender YYYY-MM-DD) -->
+
+    <button type="submit">Lagre sang</button> <!-- Sendeknapp for skjemaet -->
+  </form> <!-- Slutt på skjema -->
+  <p class="muted">Dato lagres i format YYYY-MM-DD.</p> <!-- Hjelpetekst til brukeren -->
+</section> <!-- Slutt på skjema-kort -->
+
+<section class="card"> <!-- Kort som viser registrerte sanger -->
+  <h2>Registrerte sanger</h2> <!-- Seksjonstittel -->
+  <ul> <!-- Starter liste over sanger -->
+    <% if (songs.length === 0) { %> <!-- Sjekker om listen er tom -->
+      <li>(Ingen sanger enda)</li> <!-- Viser tekst når det ikke finnes sanger -->
+    <% } %> <!-- Slutt på tom-sjekk -->
+    <% for (const s of songs) { %> <!-- Løkker gjennom alle sanger -->
+      <li> <!-- Starter listeelement -->
+        <strong><%= s.title %></strong> av <em><%= s.artist %></em> <!-- Viser tittel og artist trygt -->
+        <span class="muted">— <%= s.listened_date %></span> <!-- Viser dato trygt -->
+      </li> <!-- Slutt på listeelement -->
+    <% } %> <!-- Slutt på løkke -->
+  </ul> <!-- Slutt på liste -->
+</section> <!-- Slutt på liste-kort -->
+
+<%- include('partials/footer') %> <!-- Inkluderer footer-partialen (uten escaping) -->
