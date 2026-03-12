@@ -1,45 +1,80 @@
-<%- include('partials/header') %> <!-- Inkluderer header-partialen (uten escaping) -->
+<%- include('partials/header') %>
 
-<h1><%= title %></h1> <!-- Viser sidetittel trygt -->
+<h1>Welcome to the Account System</h1>
 
-<% if (typeof message !== 'undefined' && message) { %> <!-- Hvis serveren har sendt en melding -->
-  <div class="notice"><%= message %></div> <!-- Viser meldingen i en meldingsboks -->
-<% } %> <!-- Slutt på melding-sjekk -->
+<!-- LOGGET INN? VIS POST-SKJEMA -->
+<% if (user) { %>
 
-<section class="card"> <!-- Kort med skjema for å legge til sang -->
-  <h2>Legg til sang</h2> <!-- Seksjonstittel -->
-  <form action="/songs" method="POST" class="form"> <!-- Skjema som sender POST til /songs -->
-    <label for="title">Sangtittel</label> <!-- Etikett for tittel -->
-    <input id="title" name="title" type="text" required /> <!-- Tekstfelt for tittel (påkrevd) -->
+  <h2>Create a new post</h2>
 
-    <label for="artist">Artist</label> <!-- Etikett for artist -->
-    <input id="artist" name="artist" type="text" required /> <!-- Tekstfelt for artist (påkrevd) -->
+  <form action="/posts" method="POST">
 
-    <label for="listened_date">Dato (YYYY-MM-DD)</label> <!-- Etikett for dato -->
-    <input id="listened_date" name="listened_date" type="date" required /> <!-- Dato-input (sender YYYY-MM-DD) -->
+    <label for="title">Title</label>
+    <input id="title" name="title" type="text" required />
 
-    <label for="nationality">Nasjonalitet</label> <!-- Etikett for nasjonalitet -->
-    <input id="nationality" name="nationality" type="text" required /> <!-- Tekstfelt for nasjonalitet (påkrevd) -->
+    <label for="content">Content</label>
+    <textarea id="content" name="content" required></textarea>
 
-    <button type="submit">Lagre sang</button> <!-- Sendeknapp for skjemaet -->
-  </form> <!-- Slutt på skjema -->
-  <p class="muted">Dato lagres i format YYYY-MM-DD.</p> <!-- Hjelpetekst til brukeren -->
-</section> <!-- Slutt på skjema-kort -->
+    <button type="submit">Publish Post</button>
 
-<section class="card"> <!-- Kort som viser registrerte sanger -->
-  <h2>Registrerte sanger</h2> <!-- Seksjonstittel -->
-  <ul> <!-- Starter liste over sanger -->
-    <% if (songs.length === 0) { %> <!-- Sjekker om listen er tom -->
-      <li>(Ingen sanger enda)</li> <!-- Viser tekst når det ikke finnes sanger -->
-    <% } %> <!-- Slutt på tom-sjekk -->
-    <% for (const s of songs) { %> <!-- Løkker gjennom alle sanger -->
-      <li> <!-- Starter listeelement -->
-        <strong><%= s.title %></strong> av <em><%= s.artist %></em> <!-- Viser tittel og artist trygt -->
-        <span class="muted">— <%= s.listened_date %></span> <!-- Viser dato trygt -->
-        <span class="muted">— <%= s.nationality %></span> <!-- Viser nasjonalitet trygt -->
-      </li> <!-- Slutt på listeelement -->
-    <% } %> <!-- Slutt på løkke -->
-  </ul> <!-- Slutt på liste -->
-</section> <!-- Slutt på liste-kort -->
+  </form>
 
-<%- include('partials/footer') %> <!-- Inkluderer footer-partialen (uten escaping) -->
+<% } else { %>
+
+  <p><a href="/login">Login</a> or <a href="/signup">Sign up</a> to create posts and comment.</p>
+
+<% } %>
+
+<hr>
+
+<!-- LISTE OVER POSTS -->
+<h2>All Posts</h2>
+
+<% if (!posts || posts.length === 0) { %>
+  <p>(No posts yet)</p>
+<% } else { %>
+
+  <% posts.forEach(post => { %>
+
+    <div class="post">
+      <h3><%= post.title %></h3>
+      <p><%= post.content %></p>
+      <p class="muted">
+        Posted by <strong><%= post.username %></strong> on <%= new Date(post.created_at).toLocaleString() %>
+      </p>
+
+      <!-- SLETT KNAPP FOR EIER -->
+      <% if (user && user.id === post.user_id) { %>
+        <form action="/delete-post/<%= post.id %>" method="POST" style="display:inline;">
+          <button>Delete</button>
+        </form>
+      <% } %>
+
+      <!-- KOMMENTARER -->
+      <div class="comments">
+        <h4>Comments:</h4>
+        <% if (post.comments && post.comments.length > 0) { %>
+          <% post.comments.forEach(comment => { %>
+            <p><strong><%= comment.username %>:</strong> <%= comment.comment %></p>
+          <% }) %>
+        <% } else { %>
+          <p>(No comments yet)</p>
+        <% } %>
+      </div>
+
+      <!-- LEGG TIL KOMMENTAR -->
+      <% if (user) { %>
+        <form action="/comment/<%= post.id %>" method="POST">
+          <input type="text" name="comment" placeholder="Write a comment..." required />
+          <button>Comment</button>
+        </form>
+      <% } %>
+
+      <hr>
+    </div>
+
+  <% }) %>
+
+<% } %>
+
+<%- include('partials/footer') %>

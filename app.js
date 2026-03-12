@@ -1,105 +1,372 @@
-// Importerer innebygd 'path' for trygg håndtering av filstier på tvers av OS
-const path = require('path'); // Brukes til å lage korrekte stier til views, public og databasefil
+// Importerer path for trygge filstier
+const path = require('path');
 
-// Importerer Express-rammeverket
-const express = require('express'); // Gjør det enkelt å lage HTTP-server og ruter
+// Importerer express
+const express = require('express');
 
-// Importerer SQLite3-driveren for Node.js
-const sqlite3 = require('sqlite3').verbose(); // Lar oss koble til og kjøre SQL mot en lokal SQLite-fil
+// Importerer sqlite
+const sqlite3 = require('sqlite3').verbose();
 
-// Lager en ny Express-applikasjon
-const app = express(); // Initialiserer Express-appen
+// Importerer hashing og sessions
+const bcrypt = require('bcrypt');
+const session = require('express-session');
 
-// Setter portnummeret som serveren skal lytte på
-const PORT = 3000; // Standard port for lokal utvikling
+// Lager express app
+const app = express();
 
-// Åpner/oppretter SQLite-databasefilen 'EJS_MusikkDatabase.db' i prosjektmappen
-const db = new sqlite3.Database(path.join(__dirname, 'EJS_MusikkDatabase.db')); // Oppretter/åpner databasefilen der data lagres
+// Port
+const PORT = 3000;
 
-// Oppretter 'songs'-tabellen hvis den ikke finnes fra før
-db.serialize(() => { // Sørger for at SQL-kommandoer kjører i rekkefølge
-  db.run(` -- Starter SQL for å lage tabellen
-    CREATE TABLE IF NOT EXISTS songs (               -- Lager tabellen bare hvis den ikke finnes
-      id INTEGER PRIMARY KEY AUTOINCREMENT,          -- Primærnøkkel som øker automatisk
-      title TEXT NOT NULL,                           -- Sangtittel (påkrevd)
-      artist TEXT NOT NULL,                          -- Artistnavn (påkrevd)
-      listened_date TEXT NOT NULL,                   -- Dato i format YYYY-MM-DD (påkrevd)
-      nationality TEXT NOT NULL                      -- Nasjonalitet (påkrevd)
-)                                                -- Slutt på CREATE TABLE
-  `); // Avslutter kjøringen av SQL-setningen
-}); // Avslutter serialize-blokk
 
-// Setter EJS som templatemotor
-app.set('view engine', 'ejs'); // Forteller Express at .ejs-filer skal rendre HTML
+// ---------------- DATABASE ----------------
 
-// Angir mappen som inneholder EJS-visningene
-app.set('views', path.join(__dirname, 'views')); // Sikrer korrekt sti til 'views'-mappen
+// Koble til SQLite database
+const db = new sqlite3.Database(path.join(__dirname, 'database.db'));
 
-// Gjør statiske filer tilgjengelig (f.eks. CSS) fra 'public'-mappen
-app.use(express.static(path.join(__dirname, 'public'))); // Lar nettleseren hente /styles.css osv.
 
-// Aktiverer parsing av URL-enkodede skjemaer (application/x-www-form-urlencoded)
-app.use(express.urlencoded({ extended: true })); // Lar oss lese req.body ved POST fra HTML-skjema
+// Oppretter tabeller hvis de ikke finnes
+db.serialize(() => {
 
-// Hjelpefunksjon: kjør SELECT som henter flere rader (Promise-basert)
-function dbAll(sql, params = []) { // Definerer en funksjon for å kjøre SELECT som returnerer flere rader
-  return new Promise((resolve, reject) => { // Returnerer et Promise for å kunne bruke async/await
-    db.all(sql, params, (err, rows) => { // Kjører spørringen med parametere
-      if (err) return reject(err); // Avviser Promise hvis SQL-feil oppstår
-      resolve(rows); // Løser Promise med resultat-radene
-    }); // Avslutter callback for db.all
-  }); // Avslutter Promise
-} // Avslutter funksjonen dbAll
+  // Users table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL
+    )
+  `);
 
-// Hjelpefunksjon: kjør INSERT/UPDATE/DELETE (Promise-basert)
-function dbRun(sql, params = []) { // Definerer en funksjon for å kjøre skrivende spørringer
-  return new Promise((resolve, reject) => { // Returnerer et Promise
-    db.run(sql, params, function (err) { // Kjører spørringen og beholder 'this' for lastID/changes
-      if (err) return reject(err); // Avviser Promise ved SQL-feil
-      resolve(this); // Løser Promise med 'this' (inneholder lastID for INSERT)
-    }); // Avslutter callback for db.run
-  }); // Avslutter Promise
-} // Avslutter funksjonen dbRun
+  // Posts table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      user_id INTEGER,
+      created_at TEXT,
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+  `);
 
-// GET / - viser skjema for å legge inn sang og lister alle lagrede sanger
-app.get('/', async (req, res) => { // Definerer rute for å vise startsiden
-  try { // Starter try/catch for feilhandtering
-    const songs = await dbAll( // Henter alle sanger fra databasen
-      'SELECT id, title, artist, listened_date, nationality FROM songs ORDER BY listened_date DESC, id DESC', // SQL for å liste sanger
-      [] // Ingen parametere for denne spørringen
-    ); // Avslutter henting av sanger
-    res.render('index', { title: 'Registrer sanger', songs, message: null }); // Renderer index.ejs med data
-  } catch (err) { // Fanger eventuelle feil
-    console.error(err); // Logger feilen i konsollen
-    res.status(500).send('Noe gikk galt.'); // Sender en enkel feilmelding til klienten
-  } // Avslutter try/catch
-}); // Avslutter GET-ruten
+  // Comments table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      comment TEXT NOT NULL,
+      user_id INTEGER,
+      post_id INTEGER,
+      created_at TEXT,
+      FOREIGN KEY(user_id) REFERENCES users(id),
+      FOREIGN KEY(post_id) REFERENCES posts(id)
+    )
+  `);
 
-// POST /songs - validerer og lagrer en ny sang i databasen
-app.post('/songs', async (req, res) => { // Definerer rute for innsending av nytt sangskjema
-  try { // Starter try/catch for å håndtere feil
-    const { title, artist, listened_date, nationality } = req.body; // Leser ut feltene fra skjemaet
-    if (!title || !artist || !listened_date || !nationality) { // Sjekker at alle felt er utfylt
-      const songs = await dbAll('SELECT id, title, artist, listened_date, nationality FROM songs ORDER BY listened_date DESC, id DESC'); // Henter liste for visning ved feil
-      return res.status(400).render('index', { title: 'Registrer sanger', songs, message: 'Fyll ut tittel, artist, dato og nasjonalitet.' }); // Viser feilmelding
-    } // Avslutter validering for tomme felt
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(listened_date)) { // Sjekker at dato har format YYYY-MM-DD
-      const songs = await dbAll('SELECT id, title, artist, listened_date, nationality FROM songs ORDER BY listened_date DESC, id DESC'); // Henter liste for visning ved feil
-      return res.status(400).render('index', { title: 'Registrer sanger', songs, message: 'Dato må være i format YYYY-MM-DD.' }); // Viser feilmelding om datoformat
-    } // Avslutter datoformat-sjekk
-    await dbRun( // Kjører INSERT for å lagre sangen
-      'INSERT INTO songs (title, artist, listened_date, nationality) VALUES (?, ?, ?, ?)', // SQL med parametere
-      [title.trim(), artist.trim(), listened_date, nationality.trim()] // Verdier å sette inn (trim fjerner ekstra mellomrom)
-    ); // Avslutter INSERT
-    res.redirect('/'); // Sender brukeren tilbake til forsiden for å se oppdatert liste
-  } catch (err) { // Fanger uventede feil
-    console.error(err); // Logger feilen
-    const songs = await dbAll('SELECT id, title, artist, listened_date, nationality FROM songs ORDER BY listened_date DESC, id DESC'); // Henter liste for visning ved feil
-    res.status(500).render('index', { title: 'Registrer sanger', songs, message: 'Kunne ikke lagre sangen.' }); // Viser generell feilmelding
-  } // Avslutter try/catch
-}); // Avslutter POST-ruten
+});
 
-// Starter serveren
-app.listen(PORT, () => { // Ber Express lytte på definert port
-  console.log(`Server kjører på http://localhost:${PORT}`); // Logger URL for lett tilgang i nettleser
-}); // Avslutter app.listen
+
+// ---------------- EXPRESS SETUP ----------------
+
+// templating engine
+app.set('view engine', 'ejs');
+
+// views mappe
+app.set('views', path.join(__dirname, 'views'));
+
+// public mappe
+app.use(express.static(path.join(__dirname, 'public')));
+
+// form parsing
+app.use(express.urlencoded({ extended: true }));
+
+// sessions
+app.use(session({
+  secret: "secretkey",
+  resave: false,
+  saveUninitialized: false
+}));
+
+
+// ---------------- DATABASE HELPERS ----------------
+
+// SELECT flere rader
+function dbAll(sql, params = []) {
+  return new Promise((resolve, reject) => {
+
+    db.all(sql, params, (err, rows) => {
+
+      if (err) {
+        reject(err);
+      } else {
+        resolve(rows);
+      }
+
+    });
+
+  });
+}
+
+// INSERT / UPDATE / DELETE
+function dbRun(sql, params = []) {
+  return new Promise((resolve, reject) => {
+
+    db.run(sql, params, function(err) {
+
+      if (err) {
+        reject(err);
+      } else {
+        resolve(this);
+      }
+
+    });
+
+  });
+}
+
+
+// ---------------- ROUTES ----------------
+
+
+// ---------- HOME (VISER POSTS) ----------
+
+app.get('/', async (req, res) => {
+  try {
+    // Hent alle posts med brukernavn
+    const posts = await dbAll(`
+      SELECT posts.*, users.username
+      FROM posts
+      JOIN users ON posts.user_id = users.id
+      ORDER BY created_at DESC
+    `);
+
+    // Hent kommentarer for hver post
+    for (let post of posts) {
+      const comments = await dbAll(`
+        SELECT comments.*, users.username
+        FROM comments
+        JOIN users ON comments.user_id = users.id
+        WHERE post_id = ?
+        ORDER BY created_at ASC
+      `, [post.id]);
+
+      post.comments = comments;
+    }
+
+    // Render index.ejs
+    res.render('index', {
+      posts: posts,
+      user: req.session.user
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.send("Database error");
+  }
+});
+
+// ---------- SIGNUP ----------
+
+// vis signup side
+app.get('/signup', (req, res) => {
+
+  res.render('signup');
+
+});
+
+
+// registrer bruker
+app.post('/signup', async (req, res) => {
+
+  const { username, email, password } = req.body;
+
+  try {
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await dbRun(
+      "INSERT INTO users (username,email,password) VALUES (?,?,?)",
+      [username, email, hashedPassword]
+    );
+
+    res.redirect('/login');
+
+  } catch (err) {
+
+    console.error(err);
+    res.send("User already exists");
+
+  }
+
+});
+
+
+// ---------- LOGIN ----------
+
+// vis login side
+app.get('/login', (req, res) => {
+
+  res.render('login');
+
+});
+
+
+// login bruker
+app.post('/login', async (req, res) => {
+
+  const { email, password } = req.body;
+
+  try {
+
+    const user = await dbAll(
+      "SELECT * FROM users WHERE email = ?",
+      [email]
+    );
+
+    if (user.length === 0) {
+      return res.send("User not found");
+    }
+
+    const match = await bcrypt.compare(password, user[0].password);
+
+    if (match) {
+
+      req.session.user = user[0];
+
+      res.redirect('/dashboard');
+
+    } else {
+
+      res.send("Wrong password");
+
+    }
+
+  } catch (err) {
+
+    console.error(err);
+    res.send("Login error");
+
+  }
+
+});
+
+
+// ---------- LOGOUT ----------
+
+app.get('/logout', (req, res) => {
+
+  req.session.destroy(() => {
+
+    res.redirect('/');
+
+  });
+
+});
+
+
+// ---------- DASHBOARD ----------
+
+app.get('/dashboard', (req, res) => {
+
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+
+  res.render('dashboard', {
+    user: req.session.user
+  });
+
+});
+
+
+// ---------- CREATE POST ----------
+
+app.post('/posts', async (req, res) => {
+
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+
+  const { title, content } = req.body;
+
+  try {
+
+    await dbRun(
+      "INSERT INTO posts (title,content,user_id,created_at) VALUES (?,?,?,?)",
+      [title, content, req.session.user.id, new Date().toISOString()]
+    );
+
+    res.redirect('/');
+
+  } catch (err) {
+
+    console.error(err);
+    res.send("Error creating post");
+
+  }
+
+});
+
+
+// ---------- DELETE POST ----------
+
+app.post('/delete-post/:id', async (req, res) => {
+
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+
+  try {
+
+    await dbRun(
+      "DELETE FROM posts WHERE id = ? AND user_id = ?",
+      [req.params.id, req.session.user.id]
+    );
+
+    res.redirect('/');
+
+  } catch (err) {
+
+    console.error(err);
+    res.send("Error deleting post");
+
+  }
+
+});
+
+
+// ---------- ADD COMMENT ----------
+
+app.post('/comment/:postId', async (req, res) => {
+
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+
+  const { comment } = req.body;
+
+  try {
+
+    await dbRun(
+      "INSERT INTO comments (comment,user_id,post_id,created_at) VALUES (?,?,?,?)",
+      [comment, req.session.user.id, req.params.postId, new Date().toISOString()]
+    );
+
+    res.redirect('/');
+
+  } catch (err) {
+
+    console.error(err);
+    res.send("Error adding comment");
+
+  }
+
+});
+
+
+// ---------- START SERVER ----------
+
+app.listen(PORT, () => {
+
+  console.log(`Server running on http://localhost:${PORT}`);
+
+});
