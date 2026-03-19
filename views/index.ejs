@@ -1,80 +1,19 @@
-<%- include('partials/header') %>
+<%- include('partials/header', { title: "Home" }) %>
 
-<h1>Welcome to the Account System</h1>
+<h1>Posts</h1>
 
-<!-- LOGGET INN? VIS POST-SKJEMA -->
-<% if (user) { %>
-
-  <h2>Create a new post</h2>
-
-  <form action="/posts" method="POST">
-
-    <label for="title">Title</label>
-    <input id="title" name="title" type="text" required />
-
-    <label for="content">Content</label>
-    <textarea id="content" name="content" required></textarea>
-
-    <button type="submit">Publish Post</button>
-
-  </form>
-
-<% } else { %>
-
-  <p><a href="/login">Login</a> or <a href="/signup">Sign up</a> to create posts and comment.</p>
-
-<% } %>
+<form action="/add-post" method="POST">
+    <textarea name="content" placeholder="Write something..." required></textarea>
+    <br>
+    <button type="submit">Post</button>
+</form>
 
 <hr>
 
-<!-- LISTE OVER POSTS -->
-<h2>All Posts</h2>
-
-<% if (!posts || posts.length === 0) { %>
-  <p>(No posts yet)</p>
-<% } else { %>
-
-  <% posts.forEach(post => { %>
-
-    <div class="post">
-      <h3><%= post.title %></h3>
-      <p><%= post.content %></p>
-      <p class="muted">
-        Posted by <strong><%= post.username %></strong> on <%= new Date(post.created_at).toLocaleString() %>
-      </p>
-
-      <!-- SLETT KNAPP FOR EIER -->
-      <% if (user && user.id === post.user_id) { %>
-        <form action="/delete-post/<%= post.id %>" method="POST" style="display:inline;">
-          <button>Delete</button>
-        </form>
-      <% } %>
-
-      <!-- KOMMENTARER -->
-      <div class="comments">
-        <h4>Comments:</h4>
-        <% if (post.comments && post.comments.length > 0) { %>
-          <% post.comments.forEach(comment => { %>
-            <p><strong><%= comment.username %>:</strong> <%= comment.comment %></p>
-          <% }) %>
-        <% } else { %>
-          <p>(No comments yet)</p>
-        <% } %>
-      </div>
-
-      <!-- LEGG TIL KOMMENTAR -->
-      <% if (user) { %>
-        <form action="/comment/<%= post.id %>" method="POST">
-          <input type="text" name="comment" placeholder="Write a comment..." required />
-          <button>Comment</button>
-        </form>
-      <% } %>
-
-      <hr>
+<% posts.forEach(post => { %>
+    <div>
+        <p><%= post.content %></p>
     </div>
-
-  <% }) %>
-
-<% } %>
+<% }) %>
 
 <%- include('partials/footer') %>
