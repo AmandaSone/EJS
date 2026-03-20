@@ -1,0 +1,14 @@
+<%- include('partials/header', { title: "Profil" }) %> <!-- Inkluderer header med tittel -->
+
+<h1>Min profil</h1> <!-- Overskrift for profilsiden -->
+
+<div> <!-- Container for info -->
+    <p><strong>Brukernavn:</strong> <%= user.username %></p> <!-- Skriver ut brukernavn -->
+    <p><strong>Antall poster:</strong> <%= user.postCount %></p> <!-- Skriver ut antall poster -->
+    <p>
+    <strong>Konto opprettet:</strong> 
+        <%= new Date(user.created_at).toLocaleString('nb-NO') %> <!-- Viser opprettet-dato i norsk format -->
+    </p> <!-- Slutt på dato-linje -->
+</div> <!-- Slutt container -->
+
+<%- include('partials/footer') %> <!-- Inkluderer footer -->

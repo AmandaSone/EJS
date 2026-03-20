@@ -102,9 +102,35 @@ app.get("/login", (req, res) => { // Innloggingsside (viser skjema)
   res.render("login", { title: "Logg inn" }); // Renderer login.ejs med tittel
 }); // Slutt på GET /login
 
-app.get("/dashboard", requireLogin, (req, res) => { // Beskyttet dashboard-side (krever innlogging)
-  res.render("dashboard", { title: "Dashboard" }); // Renderer dashboard.ejs for innlogget bruker
-}); // Slutt på GET /dashboard
+app.get("/profile", requireLogin, (req, res) => { // Definerer GET /profile og beskytter den med requireLogin (må være innlogget)
+  const userId = req.session.userId; // Leser innlogget bruker-ID fra session
+
+  const sql = `               -- Starter SQL-spørring som henter brukerinfo og antall poster
+    SELECT 
+      u.UserID,               -- Henter brukerens ID
+      u.username,             -- Henter brukernavn
+      u.email,                -- Henter e-post (valgfritt å vise)
+      u.created_at,           -- Henter tidspunkt for når brukeren ble opprettet
+      (SELECT COUNT(*)        -- Teller antall rader i Post-tabellen
+        FROM Post p 
+        WHERE p.UserID = u.UserID) AS postCount -- Gir antall poster brukeren har laget som postCount
+    FROM User u               -- Fra User-tabellen (alias u)
+    WHERE u.UserID = ?        -- Filtrerer på innlogget bruker
+  `; // Slutt på SQL-streng
+
+  db.get(sql, [userId], (err, user) => { // Kjører spørringen, forventer én rad (db.get)
+    if (err) { // Sjekker for databasefeil
+      console.error(err); // Logger feilen
+      return res.status(500).send("Databasefeil"); // Returnerer 500 hvis DB-feil
+    } // Slutt på feil-sjekk
+
+    if (!user) { // Hvis ingen bruker funnet (skulle ikke skje for gyldig session)
+      return res.redirect("/logout"); // Logger ut hvis session er korrupt
+    } // Slutt på bruker-sjekk
+
+    res.render("profile", { title: "Profil", user }); // Renderer profile.ejs og sender med user-objektet (inkl. postCount)
+  }); // Slutt på db.get callback
+}); // Slutt på GET /profile
 
 app.get("/logout", (req, res) => { // Logg ut via link (HTML-rute)
   req.session.destroy((err) => { // Ødelegger sesjonen på serveren
@@ -278,7 +304,7 @@ app.post("/login", (req, res) => { // Legacy: Innlogging via HTML-skjema (ikke A
       const match = await bcrypt.compare(password, user.password); // Sjekker passordet mot hash
       if (match) { // Hvis passordet stemmer
         req.session.userId = user.UserID; // Lagre bruker-ID i session
-        res.redirect("/dashboard"); // Send brukeren til dashboard
+        res.redirect("/profile"); // Send brukeren til profile
       } else { // Hvis passordet er feil
         res.send("Wrong password"); // Enkel tekst-respons
       } // Slutt på passord-sjekk
