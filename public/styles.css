@@ -1,92 +1,97 @@
-/* Grunnstil for hele siden */ 
+/* Gjør hele siden til en fleksibel kolonne for sticky footer */
+html, body { /* Velger html og body */
+  height: 100%; /* Lar body fylle hele høyden av vinduet */
+} /* Slutt på html, body */
+
 body { /* Body-elementet */
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; /* Lesbar fontfamilie */
-  margin: 0; /* Fjerner standard margin */
-  padding: 0; /* Fjerner standard padding */
-  background: #f6f7fb; /* Lys bakgrunnsfarge */
+  margin: 0; /* Fjerner standard margin rundt siden */
+  font-family: Arial, sans-serif; /* Enkel standard font */
+  background: #f3f3f3; /* Lys grå bakgrunn for hele siden */
   color: #222; /* Mørk tekst for god kontrast */
-}
+  display: flex; /* Bruker flex-layout for å plassere footer i bunn */
+  flex-direction: column; /* Plasserer elementer i kolonne (topp→bunn) */
+  min-height: 100vh; /* Sørger for at body minst fyller hele høyden */
+} /* Slutt på body */
 
-/* Toppnavigasjon */
-.site-header { /* Header-område */
-  background: white; /* Hvit bakgrunn */
-  border-bottom: 1px solid #e5e7eb; /* Tynn bunnramme */
-  padding: 12px 16px; /* Indre luft */
-}
+/* Main-området skal ta opp ledig plass for å dytte footer ned */
+main { /* Main-innholdet */
+  flex: 1; /* Fyller all tilgjengelig plass mellom header og footer */
+} /* Slutt på main */
 
-/* Nav-bar layout */
-.nav { /* Navigasjonscontainer */
-  display: flex; /* Bruker flex-layout */
+/* En enkel sentrert container med maks bredde */
+.container { /* Wrapper for innhold */
+  max-width: 800px; /* Begrenser bredden for bedre lesbarhet */
+  margin: 0 auto; /* Sentrerer containeren horisontalt */
+  padding: 16px; /* Litt luft på sidene */
+} /* Slutt på .container */
+
+/* Header øverst, litt ulik bakgrunnen */
+.site-header { /* Toppfeltet (header) */
+  background: #eaeaea; /* Litt mørkere grå enn body for å skille seg ut */
+  border-bottom: 1px solid #d6d6d6; /* Tynn linje under headeren */
+} /* Slutt på .site-header */
+
+/* Enkel nav-layout i headeren */
+.nav { /* Navigasjonsrad inni header */
+  display: flex; /* Viser innhold på én rad */
   align-items: center; /* Sentrerer vertikalt */
-  justify-content: space-between; /* Plasserer elementer i hver sin ende */
-}
+  justify-content: space-between; /* Plasserer brand til venstre og lenker til høyre */
+  gap: 12px; /* Litt avstand mellom elementer ved liten skjerm */
+} /* Slutt på .nav */
 
-/* Brand/lenke-stil */
-.brand { /* Logo/brand-lenken */
-  font-weight: 700; /* Fet skrift */
-  color: #0f766e; /* Teal-farge */
-  text-decoration: none; /* Ingen understrek */
-}
+.brand a { /* Lenken for “logo/brand” */
+  color: #222; /* Mørk tekst */
+  text-decoration: none; /* Fjerner understrek */
+  font-weight: bold; /* Fet skrift for å fremheve */
+} /* Slutt på .brand a */
 
-/* Container for innhold */
-.container { /* Hovedinnpakning */
-  max-width: 800px; /* Begrenset bredde for lesbarhet */
-  margin: 24px auto; /* Sentrer og legg til topp/bunn-margin */
-  padding: 0 16px; /* Litt sidepadding */
-}
+.links a { /* Meny-lenker på høyre side */
+  color: #222; /* Mørk tekst */
+  text-decoration: none; /* Fjerner understrek */
+  margin-left: 12px; /* Litt avstand mellom lenkene */
+} /* Slutt på .links a */
 
-/* Kort-komponent */
-.card { /* Panel med kant og bakgrunn */
-  background: white; /* Hvit bakgrunn */
-  border: 1px solid #e5e7eb; /* Lys kant */
-  border-radius: 8px; /* Runde hjørner */
-  padding: 16px; /* Indre luft */
-  margin-bottom: 16px; /* Avstand under */
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04); /* Lett skygge */
-}
+.links a:hover { /* Hover-stil for lenkene */
+  text-decoration: underline; /* Enkelt hover-uttrykk: understrek lenken */
+} /* Slutt på .links a:hover */
 
-/* Skjemalayout */
-.form { /* Wrapper for skjema */
-  display: grid; /* Bruker grid-layout */
-  gap: 8px; /* Avstand mellom felter */
-}
+/* Footer nederst, litt annen farge enn header */
+.site-footer { /* Bunnfeltet (footer) */
+  background: #e0e0e0; /* Litt annerledes grå enn headeren for kontrast */
+  border-top: 1px solid #cfcfcf; /* Tynn linje over footer */
+} /* Slutt på .site-footer */
 
-/* Input-felt */
-input { /* Tekst- og dato-inputs */
-  padding: 10px; /* Indre luft for klikkflate */
-  border: 1px solid #cbd5e1; /* Lys grå kant */
-  border-radius: 6px; /* Runde hjørner */
-  font-size: 16px; /* Lesbar skriftstørrelse */
-}
+/* Enkle stiler for skjema på forsiden */
+form textarea { /* Tekstområde i skjema */
+  width: 100%; /* Fyller hele bredden av containeren */
+  min-height: 100px; /* Gir en enkel grunnhøyde */
+  padding: 8px; /* Litt innvendig luft */
+  border: 1px solid #ccc; /* Lys ramme rundt */
+  background: #fff; /* Hvit bakgrunn for kontrast */
+} /* Slutt på form textarea */
 
-/* Knapper */
-button { /* Generell knappestil */
-  background: #0ea5e9; /* Blå bakgrunn */
-  color: white; /* Hvit tekst */
-  border: none; /* Ingen kantlinje */
-  border-radius: 6px; /* Runde hjørner */
-  padding: 10px 14px; /* Indre luft */
-  font-size: 16px; /* Lesbar skriftstørrelse */
+form button { /* Send-knapp i skjema */
+  margin-top: 8px; /* Litt avstand over knappen */
+  padding: 8px 12px; /* Enkel klikkflate */
+  border: 1px solid #bbb; /* Tynn ramme */
+  background: #fff; /* Hvit bakgrunn */
   cursor: pointer; /* Pekehånd ved hover */
-}
+} /* Slutt på form button */
 
-/* Hover-effekt for knapp */
-button:hover { /* Når musen er over knappen */
-  background: #0284c7; /* Litt mørkere blå */
-}
+form button:hover { /* Hover-stil for knappen */
+  background: #f7f7f7; /* Svakt skille ved hover */
+} /* Slutt på form button:hover */
 
-/* Meldingsboks */
-.notice { /* Stil for informasjons-/feilmeldinger */
-  background: #ecfeff; /* Lys blå bakgrunn */
-  border: 1px solid #bae6fd; /* Lys blå kantlinje */
-  color: #0c4a6e; /* Mørk blå tekst */
-  padding: 10px; /* Indre luft */
-  border-radius: 6px; /* Runde hjørner */
-  margin: 12px 0; /* Avstand over og under */
-}
+/* Liste over poster på forsiden */
+.posts-list { /* Beholder for alle postene */
+  display: grid; /* Grid for jevn avstand */
+  gap: 12px; /* Avstand mellom post-boksene */
+  margin-top: 16px; /* Luft over lista */
+} /* Slutt på .posts-list */
 
-/* Dempet hjelpetekst */
-.muted { /* Mindre fremhevet tekst */
-  color: #555; /* Grå farge */
-  font-size: 14px; /* Litt mindre størrelse */
-}
+/* Én post-boks */
+.post-box { /* Boks som omslutter en enkelt post */
+  background: #ffffff; /* Hvit boks som skiller seg fra grå bakgrunn */
+  border: 1px solid #ddd; /* Lys grå kantlinje */
+  padding: 12px; /* Litt innvendig luft */
+} /* Slutt på .post-box */

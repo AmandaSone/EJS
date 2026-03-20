@@ -1,14 +1,41 @@
-<%- include('partials/header', { title: "Profil" }) %> <!-- Inkluderer header med tittel -->
+<%- include('partials/header', { title: "Profil" }) %> <!-- Inkluderer header-partial med tittel -->
 
 <h1>Min profil</h1> <!-- Overskrift for profilsiden -->
 
-<div> <!-- Container for info -->
-    <p><strong>Brukernavn:</strong> <%= user.username %></p> <!-- Skriver ut brukernavn -->
-    <p><strong>Antall poster:</strong> <%= user.postCount %></p> <!-- Skriver ut antall poster -->
-    <p>
-    <strong>Konto opprettet:</strong> 
-        <%= new Date(user.created_at).toLocaleString('nb-NO') %> <!-- Viser opprettet-dato i norsk format -->
-    </p> <!-- Slutt på dato-linje -->
-</div> <!-- Slutt container -->
+<div> <!-- Starter en container for brukerinfo -->
+    <p><strong>Brukernavn:</strong> <%= user.username %></p> <!-- Viser brukernavn -->
+    <p><strong>Antall poster:</strong> <%= user.postCount %></p> <!-- Viser antall poster -->
+    <p> <!-- Starter rad for dato -->
+    <strong>Konto opprettet:</strong> <!-- Label for dato -->
+        <%= new Date(user.created_at).toLocaleString('nb-NO') %> <!-- Norsk datoformat -->
+    </p> <!-- Slutter rad for dato -->
+</div> <!-- Slutter container for brukerinfo -->
 
-<%- include('partials/footer') %> <!-- Inkluderer footer -->
+<button id="logoutBtn" type="button">Logg ut</button> <!-- En vanlig knapp (ikke form), som vi fanger i JS -->
+
+<script> // Starter inline JavaScript
+  const btn = document.getElementById('logoutBtn'); // Henter referanse til knappen via id
+
+  btn.addEventListener('click', async () => { // Lytter på klikk på logg ut-knappen
+    try { // Starter try-catch for å håndtere feil i fetch
+      const res = await fetch('/api/auth/logout', { // Kaller API-endepunktet for logout
+        method: 'POST', // Bruker POST-metoden (bedre semantikk for state-endring)
+        headers: { 'Content-Type': 'application/json' } // Setter Content-Type header (ikke strengt nødvendig her)
+      }); // Slutt på fetch-kall
+
+      const data = await res.json(); // Leser JSON-responsen fra serveren
+
+      if (!res.ok || !data.ok) { // Sjekker om server svarte med feilstatus eller ok=false
+        alert(data.error || 'Kunne ikke logge ut'); // Viser enkel feilmelding til brukeren
+        return; // Stopper videre kjøring hvis noe feilet
+      } // Slutt på feil-sjekk
+
+      window.location.href = '/'; // Ved suksess: send brukeren til forsiden
+    } catch (err) { // Fanger uventede feil (nettverksfeil osv.)
+      console.error(err); // Logger feilen i konsollen for debugging
+      alert('En uventet feil oppstod ved utlogging'); // Viser enkel feilmelding i UI
+    } // Slutt på catch
+  }); // Slutt på event listener
+</script> <!-- Slutter inline JavaScript -->
+
+<%- include('partials/footer') %> <!-- Inkluderer footer-partial -->

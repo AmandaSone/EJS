@@ -1,18 +1,28 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= title %></title>
-    <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
+<!DOCTYPE html> <!-- Definerer dokumenttype -->
+<html lang="no"> <!-- Setter språk til norsk -->
+<head> <!-- Starter head -->
+  <meta charset="UTF-8"> <!-- Tegnsett UTF-8 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Responsiv visning -->
+  <title><%= (typeof title !== 'undefined' && title) ? title : 'Min app' %></title> <!-- Bruker side-tittel eller fallback -->
+  <link rel="stylesheet" href="/styles.css"> <!-- Laster minimal CSS fra /public/styles.css -->
+</head> <!-- Slutt head -->
+<body> <!-- Starter body-innhold -->
 
-<nav>
-    <a href="/">Home</a>
-    <a href="/login">Login</a>
-    <a href="/signup">Sign Up</a>
-    <a href="/profile">Profile</a>
-</nav>
+<header class="site-header"> <!-- Header-område øverst -->
+    <div class="container"> <!-- Sentrert container for header -->
+        <nav class="nav"> <!-- Navigasjonsrad -->
+        <div class="brand"> <!-- Område for “logo/brand” -->
+            <a href="/">Min app</a> <!-- Enkel hjem-lenke med navn -->
+        </div> <!-- Slutt brand -->
+        <div class="links"> <!-- Område for nav-lenker -->
+            <a href="/">Home</a> <!-- Lenke til forsiden -->
+            <a href="/signup">Sign Up</a> <!-- Lenke til registrering -->
+            <a href="/login">Login</a> <!-- Lenke til innlogging -->
+            <a href="/profile">Profile</a> <!-- Lenke til profil -->
+            <!-- Du kan senere bytte ut Login/Sign Up med Logout når innlogget -->
+        </div> <!-- Slutt links -->
+    </nav> <!-- Slutt nav -->
+    </div> <!-- Slutt container -->
+</header> <!-- Slutt header -->
 
-<hr>
+<main class="container"> <!-- Starter hovedinnholdet i en sentrert container -->

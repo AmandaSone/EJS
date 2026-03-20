@@ -1,19 +1,19 @@
-<%- include('partials/header', { title: "Home" }) %>
+<%- include('partials/header', { title: "Home" }) %> <!-- Inkluderer header-partial med tittel -->
 
-<h1>Posts</h1>
+<h1>Posts</h1> <!-- Overskrift for siden -->
 
-<form action="/add-post" method="POST">
-    <textarea name="content" placeholder="Write something..." required></textarea>
-    <br>
-    <button type="submit">Post</button>
-</form>
+<form action="/add-post" method="POST"> <!-- Skjema for å legge til ny post -->
+    <textarea name="content" placeholder="Write something..." required></textarea> <!-- Tekstfelt for innhold -->
+    <br> <!-- Enkel linjeskift -->
+    <button type="submit">Post</button> <!-- Knapp for å sende inn posten -->
+</form> <!-- Slutt på skjema -->
 
-<hr>
+<section class="posts-list"> <!-- Beholder for alle poster -->
+    <% posts.forEach(post => { %> <!-- Løkke over alle poster som kommer fra serveren -->
+        <article class="post-box"> <!-- Én boks per post -->
+        <p><%= post.content %></p> <!-- Viser innholdet i posten -->
+        </article> <!-- Slutt på én post-boks -->
+    <% }) %> <!-- Slutt på løkka -->
+</section> <!-- Slutt på posts-list -->
 
-<% posts.forEach(post => { %>
-    <div>
-        <p><%= post.content %></p>
-    </div>
-<% }) %>
-
-<%- include('partials/footer') %>
+<%- include('partials/footer') %> <!-- Inkluderer footer-partial (lukker main/body/html) -->
