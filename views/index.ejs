@@ -9,11 +9,70 @@
 </form> <!-- Slutt på skjema -->
 
 <section class="posts-list"> <!-- Beholder for alle poster -->
-    <% posts.forEach(post => { %> <!-- Løkke over alle poster som kommer fra serveren -->
+    <% posts.forEach(post => { %> <!-- Løkke over alle poster -->
         <article class="post-box"> <!-- Én boks per post -->
-        <p><%= post.content %></p> <!-- Viser innholdet i posten -->
-        </article> <!-- Slutt på én post-boks -->
-    <% }) %> <!-- Slutt på løkka -->
-</section> <!-- Slutt på posts-list -->
+        <p> <!-- Topp-linje med forfatter og tidspunkt -->
+            <strong><%= post.username %></strong> <!-- Viser brukernavn -->
+            - <!-- Skillepunkt -->
+            <%= post.created_at // Sjekker at feltet finnes
+                ? new Date(post.created_at) // Lager et Date-objekt fra ISO-strengen
+                    .toLocaleString('nb-NO', { // Formatterer i norsk lokalt format
+                        year: 'numeric', // Viser året (f.eks. 2026)
+                        month: '2-digit', // Viser måneden med 2 sifre (f.eks. 03)
+                        day: '2-digit', // Viser dagen med 2 sifre (f.eks. 25)
+                        hour: '2-digit', // Viser timen med 2 sifre (24-timers format i nb-NO)
+                        minute: '2-digit' // Viser minutter med 2 sifre
+                        // NB: Vi inkluderer IKKE 'second', så sekunder vises ikke
+                    })
+                : 'Ukjent tidspunkt' // Fallback for gamle poster uten created_at
+            %>
+        </p> <!-- Slutt topp-linje -->
+
+        <p><%= post.content %></p> <!-- Innholdet i posten -->
+
+        <div> <!-- Område for like-knapp -->
+            <button class="like-btn">     <!-- CSS-klasse (valgfri) -->
+            data-post-id="<%= post.PostID %>"   <!-- Lagrer PostID i data-attributt -->
+            aria-pressed="<%= post.liked ? 'true' : 'false' %>"> <!-- Tilgjengelighet: om knappen er aktiv -->
+            <%= post.liked ? 'Unlike' : 'Like' %> ( <span class="like-count"><%= post.likes %></span> ) <!-- Tekst + teller -->
+            </button> <!-- Slutt knapp -->
+        </div> <!-- Slutt like-område -->
+        </article> <!-- Slutt én post -->
+    <% }) %> <!-- Slutt løkke -->
+</section> <!-- Slutt posts-list -->
+
+<script> // Starter inline JavaScript for å håndtere klikk på like-knapper
+  document.addEventListener('click', async (e) => { // Lytter globalt på klikk
+    const btn = e.target.closest('.like-btn'); // Ser om klikket skjedde på en .like-btn
+    if (!btn) return; // Hvis ikke en like-knapp: gjør ingenting
+
+    const postId = btn.getAttribute('data-post-id'); // Leser PostID fra data-attributt
+    try { // Prøver å kalle API-et
+      const res = await fetch(`/api/posts/${postId}/like`, { // Kaller toggle-like API
+        method: 'POST', // Bruker POST som toggler like/unlike
+        headers: { 'Content-Type': 'application/json' } // Setter header (ikke strengt nødvendig her)
+      }); // Slutt fetch
+
+      const data = await res.json(); // Leser JSON-svar fra serveren
+      if (!res.ok || !data.ok) { // Sjekker for feil i HTTP-status eller payload
+        alert(data.error || 'Kunne ikke oppdatere like'); // Viser enkel feilmelding
+        return; // Stopper videre kjøring
+      } // Slutt feil-sjekk
+
+      const countEl = btn.querySelector('.like-count'); // Henter span som viser teller
+      countEl.textContent = data.likes; // Oppdaterer tallet i UI
+      btn.setAttribute('aria-pressed', data.liked ? 'true' : 'false'); // Oppdaterer pressed-tilstand
+      btn.textContent = (data.liked ? 'Unlike' : 'Like') + ` ( ${data.likes} )`; // Oppdaterer knappetekst
+    } catch (err) { // Fanger nettverksfeil/andre feil
+      console.error(err); // Logger feilen
+      alert('En uventet feil oppstod'); // Viser feilmelding
+    } // Slutt catch
+  }); // Slutt event listener
+</script> <!-- Slutt inline script -->
 
 <%- include('partials/footer') %> <!-- Inkluderer footer-partial (lukker main/body/html) -->
+
+
+
+
+
