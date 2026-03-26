@@ -6,8 +6,13 @@
     <p><strong>Brukernavn:</strong> <%= user.username %></p> <!-- Viser brukernavn -->
     <p><strong>Antall poster:</strong> <%= user.postCount %></p> <!-- Viser antall poster -->
     <p> <!-- Starter rad for dato -->
-    <strong>Konto opprettet:</strong> <!-- Label for dato -->
-        <%= new Date(user.created_at).toLocaleString('nb-NO') %> <!-- Norsk datoformat -->
+      <strong>Konto opprettet:</strong> <!-- Label for dato -->
+      <%= new Date(user.created_at) // Lager et Date-objekt fra ISO-strengen
+        .toLocaleDateString('nb-NO', { // Formaterer kun dato i norsk format
+          year: 'numeric', // Viser år med fire siffer
+          month: '2-digit', // Viser måned med to siffer
+          day: '2-digit' // Viser dag med to siffer
+        }) %> <!-- Slutt på EJS-uttrykk -->
     </p> <!-- Slutter rad for dato -->
 </div> <!-- Slutter container for brukerinfo -->
 

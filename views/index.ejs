@@ -3,10 +3,11 @@
 <h1>Posts</h1> <!-- Overskrift for siden -->
 
 <form action="/add-post" method="POST"> <!-- Skjema for å legge til ny post -->
-    <textarea name="content" placeholder="Write something..." required></textarea> <!-- Tekstfelt for innhold -->
+    <textarea class="textarea" name="content" placeholder="Write something..." required></textarea> <!-- Tekstfelt for innhold -->
     <br> <!-- Enkel linjeskift -->
     <button type="submit">Post</button> <!-- Knapp for å sende inn posten -->
 </form> <!-- Slutt på skjema -->
+
 
 <section class="posts-list"> <!-- Beholder for alle poster -->
     <% posts.forEach(post => { %> <!-- Løkke over alle poster -->
@@ -31,15 +32,20 @@
         <p><%= post.content %></p> <!-- Innholdet i posten -->
 
         <div> <!-- Område for like-knapp -->
-            <button class="like-btn">     <!-- CSS-klasse (valgfri) -->
-            data-post-id="<%= post.PostID %>"   <!-- Lagrer PostID i data-attributt -->
-            aria-pressed="<%= post.liked ? 'true' : 'false' %>"> <!-- Tilgjengelighet: om knappen er aktiv -->
-            <%= post.liked ? 'Unlike' : 'Like' %> ( <span class="like-count"><%= post.likes %></span> ) <!-- Tekst + teller -->
-            </button> <!-- Slutt knapp -->
+          
+            <button 
+              type="button"                          
+              class="like-btn"                              
+              data-post-id="<%= post.PostID %>"             
+              aria-pressed="<%= post.liked ? 'true' : 'false' %>"> <!-- State -->
+              <%= post.liked ? 'Unlike' : 'Like' %> ( <span class="like-count"><%= post.likes %></span> ) <!-- Label + count -->
+            </button> <!-- End button -->
+
         </div> <!-- Slutt like-område -->
         </article> <!-- Slutt én post -->
     <% }) %> <!-- Slutt løkke -->
 </section> <!-- Slutt posts-list -->
+
 
 <script> // Starter inline JavaScript for å håndtere klikk på like-knapper
   document.addEventListener('click', async (e) => { // Lytter globalt på klikk
@@ -47,6 +53,7 @@
     if (!btn) return; // Hvis ikke en like-knapp: gjør ingenting
 
     const postId = btn.getAttribute('data-post-id'); // Leser PostID fra data-attributt
+
     try { // Prøver å kalle API-et
       const res = await fetch(`/api/posts/${postId}/like`, { // Kaller toggle-like API
         method: 'POST', // Bruker POST som toggler like/unlike
@@ -59,16 +66,17 @@
         return; // Stopper videre kjøring
       } // Slutt feil-sjekk
 
-      const countEl = btn.querySelector('.like-count'); // Henter span som viser teller
-      countEl.textContent = data.likes; // Oppdaterer tallet i UI
-      btn.setAttribute('aria-pressed', data.liked ? 'true' : 'false'); // Oppdaterer pressed-tilstand
-      btn.textContent = (data.liked ? 'Unlike' : 'Like') + ` ( ${data.likes} )`; // Oppdaterer knappetekst
-    } catch (err) { // Fanger nettverksfeil/andre feil
-      console.error(err); // Logger feilen
-      alert('En uventet feil oppstod'); // Viser feilmelding
+      const countEl = btn.querySelector('.like-count'); // Finner teller-elementet
+      if (countEl) countEl.textContent = data.likes; // Oppdaterer tallet i UI
+      btn.setAttribute('aria-pressed', data.liked ? 'true' : 'false'); // Oppdaterer tilstand
+      btn.innerHTML = (data.liked ? 'Unlike' : 'Like') + ` ( <span class="like-count">${data.likes}</span> )`; // Oppdaterer etiketten
+    } catch (err) { // Nettverksfeil eller parsing-feil
+      console.error('Network or unexpected error:', err); // Logger i nettleserkonsollen
+      alert('En uventet feil oppstod'); // Viser varsel (du kan bytte til engelsk om du vil)
     } // Slutt catch
   }); // Slutt event listener
 </script> <!-- Slutt inline script -->
+
 
 <%- include('partials/footer') %> <!-- Inkluderer footer-partial (lukker main/body/html) -->
 

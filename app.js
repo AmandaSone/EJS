@@ -65,13 +65,12 @@ db.serialize(() => { // Kjører følgende SQL-setninger sekvensielt
   `); // Oppretter Post-tabellen (med created_at) hvis den ikke finnes
 
   db.run(`
-    CREATE TABLE IF NOT EXISTS PostLike (       -- Lager en tabell for likes
-      UserID INTEGER,                           -- Hvilken bruker som liket
-      PostID INTEGER,                           -- Hvilken post som ble liket
-      created_at TEXT,                          -- Når liken ble lagt til
-      PRIMARY KEY (UserID, PostID)              -- En bruker kan bare like en post én gang
+    CREATE TABLE IF NOT EXISTS PostLike (       -- Link table for likes
+      UserID INTEGER,                           -- Which user liked
+      PostID INTEGER,                           -- Which post was liked
+      PRIMARY KEY (UserID, PostID)              -- Enforce max 1 like per user per post
     )
-  `); // Oppretter PostLike-tabellen for å spore hvilke brukere som har liket hvilke poster
+  `); // End CREATE TABLE PostLike
 }); // Slutt på db.serialize
 
 //----------------------//
@@ -94,37 +93,38 @@ function requireApiLogin(req, res, next) { // Middleware for å beskytte API-end
 //----------------------//
 //  HTML ROUTES (EJS)   //
 //----------------------//
-app.get("/", (req, res) => { // Definerer GET / for forsiden
-  const viewerId = req.session.userId || -1; // Leser innlogget bruker-ID, eller -1 hvis utlogget (matcher ingen rader)
-  const sql = `                              -- SQL som henter poster + forfatter + likes + om viewer har liket
+app.get("/", (req, res) => { // Home page: list posts with author, likes, and viewer liked-flag
+  const viewerId = req.session.userId || -1; // -1 when logged out (matches no rows in PostLike)
+
+  const sql = `
     SELECT
-      p.PostID,                               -- Postens ID
-      p.content,                              -- Postens innhold
-      p.created_at,                           -- Når posten ble laget
-      p.likes,                                -- Antall likes (denormalisert teller i Post-tabellen)
-      u.username,                             -- Brukernavn til forfatter
-      CASE WHEN l.UserID IS NULL THEN 0 ELSE 1 END AS liked -- 1 hvis innlogget bruker har liket, ellers 0
-    FROM Post AS p                            -- Fra Post-tabellen
-    JOIN User AS u                            -- Join med User for å hente forfatter
-      ON p.UserID = u.UserID                  -- Knytter Post->User
-    LEFT JOIN PostLike AS l                   -- Venstre-join for å sjekke om viewer har liket
-      ON l.PostID = p.PostID AND l.UserID = ? -- Match på samme post OG samme bruker
-    ORDER BY p.PostID DESC                    -- Nyeste først
-  `; // Slutt på SQL-tekst
+      p.PostID,            -- Post id
+      p.content,           -- Post content
+      p.created_at,        -- Created timestamp
+      p.likes,             -- Denormalized likes counter
+      u.username,          -- Author username
+      CASE WHEN l.UserID IS NULL THEN 0 ELSE 1 END AS liked -- 1 if current viewer liked
+    FROM Post AS p
+    JOIN User AS u
+      ON p.UserID = u.UserID
+    LEFT JOIN PostLike AS l
+      ON l.PostID = p.PostID AND l.UserID = ?
+    ORDER BY p.PostID DESC
+  `; // End SQL
 
-  db.all(sql, [viewerId], (err, posts) => {   // Kjører spørringen med viewerId som parameter
-    if (err) {                                // Sjekker for databasefeil
-      console.error("SQL-feil i GET /:", err.message); // Logger detaljert feil
-      return res.status(500).send("Databasefeil");     // Returnerer 500 ved feil
-    } // Slutt på feil-sjekk
+  db.all(sql, [viewerId], (err, posts) => { // Run the query with viewerId
+    if (err) { // Handle DB error
+      console.error("SQL error in GET /:", err.message); // Log detailed error
+      return res.status(500).send("Databasefeil"); // Send generic error to client
+    } // End error check
 
-    res.render("index", {                     // Renderer index.ejs
-      posts,                                  // Sender med poster (inkl. username, likes, liked)
-      title: "Home",                          // Setter sidetittel
-      userId: req.session.userId || null      // Valgfritt: bruker-ID for visning
-    }); // Slutt på render
-  }); // Slutt på db.all
-}); // Slutt på GET /
+    res.render("index", { // Render the view
+      posts, // Posts including username, likes, liked
+      title: "Home", // Page title
+      userId: req.session.userId || null // Pass userId to views (to hide/show like button)
+    }); // End render
+  }); // End db.all
+}); // End GET /
 
 app.get("/signup", (req, res) => { // Registreringsside (viser skjema)
   res.render("signup", { title: "Registrer deg" }); // Renderer signup.ejs med tittel
@@ -269,95 +269,89 @@ app.post("/api/auth/logout", (req, res) => { // Utlogging via API (JSON)
   }); // Slutt på destroy callback
 }); // Slutt på POST /api/auth/logout
 
-app.post("/api/posts/:postId/like", requireApiLogin, (req, res) => { // API for å toggle like på en post
-  const userId = req.session.userId;           // Leser innlogget bruker-ID
-  const postId = parseInt(req.params.postId);  // Leser PostID fra URL og gjør om til tall
-
-  if (!Number.isInteger(postId)) {             // Validerer at postId er et gyldig tall
-    return res.status(400).json({ ok: false, error: "Ugyldig postId" }); // Returnerer 400 ved feil input
+app.post("/api/posts/:postId/like", requireApiLogin, (req, res) => { // Definerer API for å toggle like/unlike, krever innlogging
+  const raw = req.params.postId; // Leser postId som tekst fra URL-parameter
+  const postId = Number(raw); // Konverterer til tall (f.eks. "3" -> 3)
+  if (!Number.isInteger(postId) || postId <= 0) { // Validerer at postId er et positivt heltall
+    return res.status(400).json({ ok: false, error: "Invalid postId" }); // Returnerer 400 hvis ugyldig
   } // Slutt på validering
 
-  db.get(                                       // Sjekker om brukeren allerede har liket posten
-    "SELECT 1 FROM PostLike WHERE UserID = ? AND PostID = ?", // SQL for å finne eksisterende like
-    [userId, postId],                           // Parametere til spørringen
-    (err, row) => {                             // Callback etter SELECT
-      if (err) {                                // Sjekker for databasefeil
-        console.error("Feil ved SELECT PostLike:", err.message); // Logger feil
+  const userId = req.session.userId; // Leser innlogget bruker-ID fra session
+  const now = new Date().toISOString(); // Lager tidsstempel for like-raden
+
+  // 1) Prøv å LIKE: sett inn rad i PostLike, men ignorer hvis den finnes fra før
+  db.run( // Kjører en INSERT OR IGNORE for å unngå UNIQUE-konflikt når like finnes
+    "INSERT OR IGNORE INTO PostLike (UserID, PostID, created_at) VALUES (?, ?, ?)", // SQL for å prøve å like
+    [userId, postId, now], // Verdier: innlogget bruker, aktuell post, tidspunkt
+    function (insErr) { // Callback etter at INSERT OR IGNORE er kjørt
+      if (insErr) { // Sjekker om det oppstod databasefeil ved INSERT
+        console.error("Error INSERT OR IGNORE PostLike:", insErr.message); // Logger detaljert feil
         return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500 ved DB-feil
       } // Slutt på feil-sjekk
 
-      if (row) {                                // Hvis raden finnes: brukeren har liket → UNLIKE
-        db.run(                                 // Sletter like-raden
-          "DELETE FROM PostLike WHERE UserID = ? AND PostID = ?", // SQL for å fjerne like
-          [userId, postId],                     // Parametere
-          (delErr) => {                         // Callback etter DELETE
-            if (delErr) {                       // Sjekker for feil ved DELETE
-              console.error("Feil ved DELETE PostLike:", delErr.message); // Logger feil
-              return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500
+      if (this.changes === 1) { // Hvis én rad ble satt inn nå: brukeren har nettopp LIKET
+        db.run( // Øker likes-telleren i Post-tabellen
+          "UPDATE Post SET likes = likes + 1 WHERE PostID = ?", // SQL for å inkrementere likes
+          [postId], // Parameter: aktuell post
+          function (updErr) { // Callback etter UPDATE
+            if (updErr) { // Sjekker for DB-feil ved UPDATE
+              console.error("Error UPDATE Post (like):", updErr.message); // Logger feil
+              return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500 ved DB-feil
             } // Slutt på feil-sjekk
-
-            db.run(                             // Decrementer likes-telleren (ikke under 0)
-              "UPDATE Post SET likes = CASE WHEN likes > 0 THEN likes - 1 ELSE 0 END WHERE PostID = ?", // SQL for å redusere likes
-              [postId],                         // Parameter
-              (updErr) => {                     // Callback etter UPDATE
-                if (updErr) {                   // Sjekker for feil ved UPDATE
-                  console.error("Feil ved UPDATE Post (unlike):", updErr.message); // Logger feil
-                  return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500
+            db.get( // Leser oppdatert likes-verdi for å returnere til klient
+              "SELECT likes FROM Post WHERE PostID = ?", // SQL for å hente likes
+              [postId], // Parameter: aktuell post
+              (cntErr, row) => { // Callback etter SELECT
+                if (cntErr) { // Sjekker for feil ved SELECT
+                  console.error("Error SELECT likes (like):", cntErr.message); // Logger feil
+                  return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500 ved DB-feil
                 } // Slutt på feil-sjekk
+                return res.status(200).json({ ok: true, liked: true, likes: row.likes }); // Svar: LIKET, med ny teller
+              } // Slutt på callback
+            ); // Slutt på db.get
+          } // Slutt på callback
+        ); // Slutt på db.run (UPDATE)
+        return; // Avslutter her når LIKE ble gjort
+      } // Slutt på if (this.changes === 1)
 
-                db.get(                         // Leser ny likes-verdi for å returnere til klient
-                  "SELECT likes FROM Post WHERE PostID = ?", // SQL for å hente likes
-                  [postId],                     // Parameter
-                  (cntErr, post) => {           // Callback etter SELECT
-                    if (cntErr) {               // Sjekker for feil ved SELECT
-                      console.error("Feil ved SELECT likes (unlike):", cntErr.message); // Logger feil
-                      return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500
-                    } // Slutt på feil-sjekk
-                    return res.status(200).json({ ok: true, liked: false, likes: post.likes }); // Svarer med liked=false og oppdatert likes
-                  } // Slutt på callback
-                ); // Slutt på db.get (hent likes)
-              } // Slutt på callback for UPDATE
-            ); // Slutt på db.run (UPDATE)
-          } // Slutt på callback for DELETE
-        ); // Slutt på db.run (DELETE)
-      } else {                                  // Hvis ingen rad: brukeren har ikke liket → LIKE
-        const now = new Date().toISOString();   // Tidsstempel for like
-        db.run(                                 // Setter inn en ny like-rad
-          "INSERT INTO PostLike (UserID, PostID, created_at) VALUES (?, ?, ?)", // SQL for å opprette like
-          [userId, postId, now],                // Verdier som settes inn
-          (insErr) => {                         // Callback etter INSERT
-            if (insErr) {                       // Sjekker for DB-feil ved INSERT
-              console.error("Feil ved INSERT PostLike:", insErr.message); // Logger feil
-              return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500
-            } // Slutt på feil-sjekk
+      // 2) Hvis INSERT ikke gjorde endringer: raden fantes => brukeren har allerede liket → gjør UNLIKE
+      db.run( // Sletter like-raden for å un-like
+        "DELETE FROM PostLike WHERE UserID = ? AND PostID = ?", // SQL for å fjerne like
+        [userId, postId], // Parametere: innlogget bruker og aktuell post
+        function (delErr) { // Callback etter DELETE
+          if (delErr) { // Sjekker for DB-feil ved DELETE
+            console.error("Error DELETE PostLike (unlike):", delErr.message); // Logger feil
+            return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500 ved DB-feil
+          } // Slutt på feil-sjekk
+          if (this.changes === 0) { // Hvis ingen rader ble slettet (uvanlig, men mulig ved inkonsistens)
+            return res.status(200).json({ ok: true, liked: false, likes: undefined }); // Returnerer liked=false uten teller
+          } // Slutt på if (this.changes === 0)
 
-            db.run(                             // Øker likes-telleren i Post-tabellen
-              "UPDATE Post SET likes = likes + 1 WHERE PostID = ?", // SQL for å inkrementere likes
-              [postId],                         // Parameter
-              (updErr) => {                     // Callback etter UPDATE
-                if (updErr) {                   // Sjekker for DB-feil ved UPDATE
-                  console.error("Feil ved UPDATE Post (like):", updErr.message); // Logger feil
-                  return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500
-                } // Slutt på feil-sjekk
-
-                db.get(                         // Leser ny likes-verdi
-                  "SELECT likes FROM Post WHERE PostID = ?", // SQL for å hente likes
-                  [postId],                     // Parameter
-                  (cntErr, post) => {           // Callback etter SELECT
-                    if (cntErr) {               // Sjekker for feil ved SELECT
-                      console.error("Feil ved SELECT likes (like):", cntErr.message); // Logger feil
-                      return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500
-                    } // Slutt på feil-sjekk
-                    return res.status(200).json({ ok: true, liked: true, likes: post.likes }); // Svarer med liked=true og ny likes-verdi
-                  } // Slutt på callback
-                ); // Slutt på db.get (hent likes)
-              } // Slutt på callback for UPDATE
-            ); // Slutt på db.run (UPDATE)
-          } // Slutt på callback for INSERT
-        ); // Slutt på db.run (INSERT)
-      } // Slutt på if (row) toggle
-    } // Slutt på callback for SELECT PostLike
-  ); // Slutt på db.get
+          db.run( // Reduserer likes-telleren, men ikke under 0
+            "UPDATE Post SET likes = CASE WHEN likes > 0 THEN likes - 1 ELSE 0 END WHERE PostID = ?", // SQL for å decrementere
+            [postId], // Parameter: aktuell post
+            function (updErr2) { // Callback etter UPDATE
+              if (updErr2) { // Sjekker for DB-feil ved UPDATE
+                console.error("Error UPDATE Post (unlike):", updErr2.message); // Logger feil
+                return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500 ved DB-feil
+              } // Slutt på feil-sjekk
+              db.get( // Leser oppdatert likes-verdi
+                "SELECT likes FROM Post WHERE PostID = ?", // SQL for å hente likes
+                [postId], // Parameter: aktuell post
+                (cntErr2, row2) => { // Callback etter SELECT
+                  if (cntErr2) { // Sjekker for feil ved SELECT
+                    console.error("Error SELECT likes (unlike):", cntErr2.message); // Logger feil
+                    return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500 ved DB-feil
+                  } // Slutt på feil-sjekk
+                  return res.status(200).json({ ok: true, liked: false, likes: row2.likes }); // Svar: UNLIKET, med ny teller
+                } // Slutt på callback
+              ); // Slutt på db.get
+            } // Slutt på callback
+          ); // Slutt på db.run (UPDATE)
+        } // Slutt på callback
+      ); // Slutt på db.run (DELETE)
+    } // Slutt på callback for INSERT OR IGNORE
+  ); // Slutt på db.run (INSERT OR IGNORE)
 }); // Slutt på POST /api/posts/:postId/like
 
 //----------------------//

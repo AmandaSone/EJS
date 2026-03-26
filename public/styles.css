@@ -91,7 +91,12 @@ form button:hover { /* Hover-stil for knappen */
 
 /* Én post-boks */
 .post-box { /* Boks som omslutter en enkelt post */
+  text-overflow:clip;
   background: #ffffff; /* Hvit boks som skiller seg fra grå bakgrunn */
   border: 1px solid #ddd; /* Lys grå kantlinje */
   padding: 12px; /* Litt innvendig luft */
 } /* Slutt på .post-box */
+
+textarea {
+  resize: none;
+}
