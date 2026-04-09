@@ -20,7 +20,7 @@ main { /* Main-innholdet */
 
 /* En enkel sentrert container med maks bredde */
 .container { /* Wrapper for innhold */
-  max-width: 800px; /* Begrenser bredden for bedre lesbarhet */
+  max-width: 1000px; /* Begrenser bredden for bedre lesbarhet */
   margin: 0 auto; /* Sentrerer containeren horisontalt */
   padding: 16px; /* Litt luft på sidene */
 } /* Slutt på .container */
@@ -87,10 +87,14 @@ form button:hover { /* Hover-stil for knappen */
   display: grid; /* Grid for jevn avstand */
   gap: 12px; /* Avstand mellom post-boksene */
   margin-top: 16px; /* Luft over lista */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 } /* Slutt på .posts-list */
 
 /* Én post-boks */
 .post-box { /* Boks som omslutter en enkelt post */
+  max-width: 100%;
   text-overflow:clip;
   background: #ffffff; /* Hvit boks som skiller seg fra grå bakgrunn */
   border: 1px solid #ddd; /* Lys grå kantlinje */

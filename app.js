@@ -160,7 +160,28 @@ app.get("/profile", requireLogin, (req, res) => { // Definerer GET /profile og b
       return res.redirect("/logout"); // Logger ut hvis session er korrupt
     } // Slutt på bruker-sjekk
 
-    res.render("profile", { title: "Profil", user }); // Renderer profile.ejs og sender med user-objektet (inkl. postCount)
+    const postsSql = `    -- SQL for å hente ALLE poster som denne brukeren har laget
+      SELECT 
+        p.PostID,         -- Postens ID
+        p.content,        -- Innhold i posten
+        p.created_at,     -- Når posten ble laget
+        p.likes,          -- Antall likes på posten
+        CASE WHEN l.UserID IS NULL THEN 0 ELSE 1 END AS liked -- Om innloggede bruker har likt posten (1/0)
+      FROM Post p         -- Fra Post-tabellen
+      LEFT JOIN PostLike l      -- Left-join for like-status
+        ON p.PostID = l.PostID AND l.UserID = ?   -- Sjekk like-status for den innloggede brukeren (viewer = deg selv)
+      WHERE p.UserID = ?        -- Filtrer på bruker
+      ORDER BY p.PostID DESC    -- Nyeste først
+    `; //Slutt SQL for poster
+
+    db.all(postsSql, [userId, userId], (err2, posts) => { // Kjører spørringen for å hente poster
+      if (err2) { // Sjekker for DB-feil
+        console.error(err2);  // Logger feilen
+        return res.status(500).send("Databasefeil");
+      } // sLutt feil-sjekk
+
+      res.render("profile", { title: "Profil", user, posts }); // Renderer profile.ejs og sender med user-objektet (inkl. postCount)
+    }); // Slutt db.all for poster
   }); // Slutt på db.get callback
 }); // Slutt på GET /profile
 
@@ -281,8 +302,8 @@ app.post("/api/posts/:postId/like", requireApiLogin, (req, res) => { // Definere
 
   // 1) Prøv å LIKE: sett inn rad i PostLike, men ignorer hvis den finnes fra før
   db.run( // Kjører en INSERT OR IGNORE for å unngå UNIQUE-konflikt når like finnes
-    "INSERT OR IGNORE INTO PostLike (UserID, PostID, created_at) VALUES (?, ?, ?)", // SQL for å prøve å like
-    [userId, postId, now], // Verdier: innlogget bruker, aktuell post, tidspunkt
+    "INSERT OR IGNORE INTO PostLike (UserID, PostID) VALUES (?, ?)", // SQL for å prøve å like
+    [userId, postId], // Verdier: innlogget bruker, aktuell post
     function (insErr) { // Callback etter at INSERT OR IGNORE er kjørt
       if (insErr) { // Sjekker om det oppstod databasefeil ved INSERT
         console.error("Error INSERT OR IGNORE PostLike:", insErr.message); // Logger detaljert feil

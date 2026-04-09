@@ -18,29 +18,81 @@
 
 <button id="logoutBtn" type="button">Logg ut</button> <!-- En vanlig knapp (ikke form), som vi fanger i JS -->
 
-<script> // Starter inline JavaScript
-  const btn = document.getElementById('logoutBtn'); // Henter referanse til knappen via id
+<h2>Mine innlegg</h2> <!-- Overskrift for seksjonen med egne innlegg -->
 
-  btn.addEventListener('click', async () => { // Lytter på klikk på logg ut-knappen
-    try { // Starter try-catch for å håndtere feil i fetch
-      const res = await fetch('/api/auth/logout', { // Kaller API-endepunktet for logout
-        method: 'POST', // Bruker POST-metoden (bedre semantikk for state-endring)
-        headers: { 'Content-Type': 'application/json' } // Setter Content-Type header (ikke strengt nødvendig her)
-      }); // Slutt på fetch-kall
+<section class="posts-list"> <!-- Beholder for alle egne poster -->
+  <% if (posts && posts.length) { %> <!-- Sjekker om det finnes noen poster -->
+    <% posts.forEach(post => { %> <!-- Løkke over hver post sendt fra serveren -->
+      <article class="post-box"> <!-- En boks for én post -->
+        <p> <!-- Topp-linje med tidspunkt for posten -->
+          <%= typeof formatPostTime === 'function' // Hvis du har helperen formatPostTime
+                ? formatPostTime(post.created_at) // Bruk helperen som viser dato+tid (<24t) eller bare dato (>=24t)
+                : (post.created_at                // Ellers: enkel fallback-formattering direkte i EJS
+                    ? new Date(post.created_at).toLocaleString('nb-NO', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
+                    : 'Ukjent tidspunkt') %> <!-- Fallback hvis created_at mangler -->
+        </p> <!-- Slutt topp-linje -->
 
-      const data = await res.json(); // Leser JSON-responsen fra serveren
+        <p class="post-content"><%= post.content %></p> <!-- Bevarer linjeskift og bryter lange ord -->
 
-      if (!res.ok || !data.ok) { // Sjekker om server svarte med feilstatus eller ok=false
-        alert(data.error || 'Kunne ikke logge ut'); // Viser enkel feilmelding til brukeren
-        return; // Stopper videre kjøring hvis noe feilet
-      } // Slutt på feil-sjekk
+        <button type="button" class="like-btn"
+          data-post-id="<%= post.PostID %>"               
+          aria-pressed="<%= post.liked ? 'true' : 'false' %>"> <!-- Tilstand for tilgjengelighet -->
+          <span class="like-label"><%= post.liked ? 'Unlike' : 'Like' %></span> <!-- Label for knappen -->
+          ( <span class="like-count"><%= post.likes %></span> ) <!-- Teller for likes -->
+        </button> <!-- Slutt på like-knapp -->
+      </article> <!-- Slutt på én post-boks -->
+    <% }) %> <!-- Slutt på løkke -->
+  <% } else { %> <!-- Hvis brukeren ikke har noen poster -->
+    <p>Ingen innlegg ennå.</p> <!-- Informasjonstekst -->
+  <% } %> <!-- Slutt på if/else -->
+</section> <!-- Slutt på seksjonen med poster -->
 
-      window.location.href = '/'; // Ved suksess: send brukeren til forsiden
-    } catch (err) { // Fanger uventede feil (nettverksfeil osv.)
-      console.error(err); // Logger feilen i konsollen for debugging
-      alert('En uventet feil oppstod ved utlogging'); // Viser enkel feilmelding i UI
-    } // Slutt på catch
-  }); // Slutt på event listener
-</script> <!-- Slutter inline JavaScript -->
+<script>
+document.addEventListener('click', async (e) => { // Lytter på alle klikk på siden
+  const likeBtn = e.target.closest('.like-btn'); // Prøver å finne en like-knapp nærmest klikket
+  const logoutBtn = e.target.closest('#logoutBtn'); // Prøver å finne logout-knappen nærmest klikket
+
+  if (likeBtn) { // Hvis klikket var på en like-knapp
+    const postId = likeBtn.dataset.postId; // Leser PostID fra data-attributt
+    try { // Starter try-catch for å håndtere feil
+      const res = await fetch(`/api/posts/${encodeURIComponent(postId)}/like`, { method: 'POST' }); // Kaller toggle-like API
+      if (res.status === 401) { // Sjekker om bruker ikke er innlogget
+        alert('You must log in to like.'); // Viser feilmelding
+        return; // Stopper videre kjøring
+      } // Slutt 401-sjekk
+      const data = await res.json(); // Leser JSON-respons
+      if (!res.ok || !data.ok) { // Sjekker for API-feil
+        alert(data.error || 'Could not update like'); // Viser feilmelding
+        return; // Stopper videre kjøring
+      } // Slutt feil-sjekk
+      likeBtn.setAttribute('aria-pressed', data.liked ? 'true' : 'false'); // Oppdaterer ARIA-tilstand
+      const labelEl = likeBtn.querySelector('.like-label'); // Finner label-span
+      if (labelEl) labelEl.textContent = data.liked ? 'Unlike' : 'Like'; // Oppdaterer label-tekst
+      const countEl = likeBtn.querySelector('.like-count'); // Finner teller-span
+      if (countEl) countEl.textContent = data.likes; // Oppdaterer teller
+    } catch (err) { // Fanger uventede feil
+      console.error('Network or unexpected error:', err); // Logger feilen
+      alert('En uventet feil oppstod'); // Viser feilmelding
+    } // Slutt catch
+    return; // Viktig: returner her så ikke logout-koden under kjøres for samme klikk
+  } // Slutt like-håndtering
+
+  if (logoutBtn) { // Hvis klikket var på logout-knappen
+    try { // Starter try-catch for logout-kallet
+      const res = await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' } }); // Kaller logout-API
+      const data = await res.json(); // Leser JSON-respons
+      if (!res.ok || !data.ok) { // Sjekker for API-feil
+        alert(data.error || 'Kunne ikke logge ut'); // Viser feilmelding
+        return; // Stopper videre kjøring
+      } // Slutt feil-sjekk
+      window.location.href = '/'; // Redirect til forsiden ved suksess
+    } catch (err) { // Fanger uventede feil
+      console.error(err); // Logger feilen i konsollen
+      alert('En uventet feil oppstod ved utlogging'); // Viser feilmelding
+    } // Slutt catch
+    return; // Avslutter etter logout-håndtering
+  } // Slutt logout-håndtering
+}); // Slutt på document-klikklytter
+</script>
 
 <%- include('partials/footer') %> <!-- Inkluderer footer-partial -->
