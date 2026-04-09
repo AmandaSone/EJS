@@ -87,10 +87,13 @@ form button:hover { /* Hover-stil for knappen */
   display: grid; /* Grid for jevn avstand */
   gap: 12px; /* Avstand mellom post-boksene */
   margin-top: 16px; /* Luft over lista */
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-word;
 } /* Slutt på .posts-list */
+
+.post-content {
+  white-space: pre-wrap;
+  overflow: anywhere;
+  word-break: break-word;
+}
 
 /* Én post-boks */
 .post-box { /* Boks som omslutter en enkelt post */
