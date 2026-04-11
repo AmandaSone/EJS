@@ -49,20 +49,20 @@ db.serialize(() => { // Kjører følgende SQL-setninger sekvensielt
       UserID INTEGER PRIMARY KEY AUTOINCREMENT, -- Unik ID for bruker
       username TEXT UNIQUE, -- Unikt brukernavn (hindrer duplikater)
       password TEXT, -- Hash av passord (lagres med bcrypt)
-      email TEXT, -- E-postadresse (kan settes UNIQUE hvis ønskelig)
+      email TEXT UNIQUE, -- Unik E-postadresse (hindrer duplikater)
       created_at TEXT -- ISO-dato for når brukeren ble opprettet
     )
   `); // Oppretter User-tabellen hvis den ikke finnes
 
   db.run(`
-    CREATE TABLE IF NOT EXISTS Post (
-      PostID INTEGER PRIMARY KEY AUTOINCREMENT, -- Unik ID for post
-      UserID INTEGER, -- ID til brukeren som eier posten
-      content TEXT, -- Innholdet i posten
-      likes INTEGER DEFAULT 0, -- Antall likes, standard 0
-      created_at TEXT -- ISO-dato for når posten ble laget
-    )
-  `); // Oppretter Post-tabellen (med created_at) hvis den ikke finnes
+  CREATE TABLE IF NOT EXISTS Post (
+    PostID INTEGER PRIMARY KEY AUTOINCREMENT, -- Unik ID for post
+    UserID INTEGER,                            -- Hvem som eier posten
+    content TEXT,                              -- Innhold i posten
+    created_at TEXT,                           -- Når posten ble laget
+    ParentPostID INTEGER                       -- NULL for toppnivå; ellers peker til en annen PostID (kommentar)
+  )
+`); // Lager Post-tabellen hvis den ikke finnes
 
   db.run(`
     CREATE TABLE IF NOT EXISTS PostLike (       -- Link table for likes
@@ -93,37 +93,86 @@ function requireApiLogin(req, res, next) { // Middleware for å beskytte API-end
 //----------------------//
 //  HTML ROUTES (EJS)   //
 //----------------------//
-app.get("/", (req, res) => { // Home page: list posts with author, likes, and viewer liked-flag
-  const viewerId = req.session.userId || -1; // -1 when logged out (matches no rows in PostLike)
+app.get("/", (req, res) => { // Defines GET / for the homepage
+  const viewerId = req.session.userId || -1; // Reads current viewer’s userId or -1 if logged out
 
-  const sql = `
+  const postsSql = `                     -- SQL to fetch top-level posts with likeCount, liked and commentCount
     SELECT
-      p.PostID,            -- Post id
-      p.content,           -- Post content
-      p.created_at,        -- Created timestamp
-      p.likes,             -- Denormalized likes counter
-      u.username,          -- Author username
-      CASE WHEN l.UserID IS NULL THEN 0 ELSE 1 END AS liked -- 1 if current viewer liked
+      p.PostID,                           -- Post id
+      p.content,                          -- Post content
+      p.created_at,                       -- Timestamp for the post
+      u.username,                         -- Author username
+      (SELECT COUNT(*) 
+        FROM PostLike pl 
+        WHERE pl.PostID = p.PostID) AS likeCount,       -- Number of likes for this post
+      (SELECT COUNT(*) 
+        FROM Post c 
+        WHERE c.ParentPostID = p.PostID) AS commentCount, -- Number of direct comments for this post
+      CASE WHEN l.UserID IS NULL THEN 0 ELSE 1 END AS liked -- 1 if current viewer liked this post
     FROM Post AS p
-    JOIN User AS u
-      ON p.UserID = u.UserID
-    LEFT JOIN PostLike AS l
-      ON l.PostID = p.PostID AND l.UserID = ?
-    ORDER BY p.PostID DESC
+    JOIN User AS u 
+      ON u.UserID = p.UserID
+    LEFT JOIN PostLike AS l 
+      ON l.PostID = p.PostID AND l.UserID = ?           -- Checks if current viewer liked
+    WHERE p.ParentPostID IS NULL                         -- Only top-level posts (not comments)
+    ORDER BY p.PostID DESC                               -- Newest first
   `; // End SQL
 
-  db.all(sql, [viewerId], (err, posts) => { // Run the query with viewerId
-    if (err) { // Handle DB error
-      console.error("SQL error in GET /:", err.message); // Log detailed error
-      return res.status(500).send("Databasefeil"); // Send generic error to client
-    } // End error check
+  db.all(postsSql, [viewerId], (err, topPosts) => { // Runs the query and returns an array of posts
+    if (err) { // Checks for DB error
+      console.error("SQL error in GET / (posts):", err.message); // Logs details for debugging
+      return res.status(500).send("Databasefeil"); // Sends generic 500 to client
+    } // End error handling
 
-    res.render("index", { // Render the view
-      posts, // Posts including username, likes, liked
-      title: "Home", // Page title
-      userId: req.session.userId || null // Pass userId to views (to hide/show like button)
-    }); // End render
-  }); // End db.all
+    if (topPosts.length === 0) { // If there are no top-level posts
+      return res.render("index", { // Render immediately with empty posts
+        posts: [], // No posts
+        commentsByParent: {}, // No comments
+        title: "Home", // Page title
+        userId: req.session.userId || null // Viewer
+      }); // End render
+    } // End no-posts branch
+
+    const parentIds = topPosts.map(p => p.PostID); // Collects all top-level PostIDs to fetch their comments
+    const placeholders = parentIds.map(() => "?").join(","); // Builds (?, ?, ?) placeholder string for IN clause
+
+    const commentsSql = `                 -- SQL to fetch comments for all top-level posts in one go
+      SELECT
+        c.PostID,                         -- Comment id (also a PostID)
+        c.ParentPostID,                   -- The parent post this comment belongs to
+        c.content,                        -- Comment text
+        c.created_at,                     -- Timestamp for the comment
+        u.username                        -- Comment author username
+      FROM Post AS c
+      JOIN User AS u 
+        ON u.UserID = c.UserID
+      WHERE c.ParentPostID IN (${placeholders})       -- Only comments for the loaded top-level posts
+      ORDER BY c.created_at ASC                       -- Oldest → newest for natural reading order
+    `; // End SQL
+
+    db.all(commentsSql, parentIds, (err2, comments) => { // Runs query for all comments
+      if (err2) { // DB error on comments
+        console.error("SQL error in GET / (comments):", err2.message); // Logs details
+        return res.status(500).send("Databasefeil"); // Sends 500
+      } // End error handling
+
+      // Group comments by ParentPostID so EJS can do commentsByParent[postId]
+      const commentsByParent = {}; // Initializes grouping object
+      for (const c of comments) { // Loops all comments
+        const pid = c.ParentPostID; // Reads parent id
+        if (!commentsByParent[pid]) commentsByParent[pid] = []; // Creates array if missing
+        commentsByParent[pid].push(c); // Pushes comment into its parent’s list
+      } // End grouping loop
+
+      // Render the view with posts and grouped comments
+      res.render("index", { // Renders index.ejs
+        posts: topPosts, // Top-level posts with counts and liked flag
+        commentsByParent, // Object mapping parentId -> array of comments
+        title: "Home", // Page title
+        userId: req.session.userId || null // Viewer user id for UI logic
+      }); // End render
+    }); // End db.all(comments)
+  }); // End db.all(posts)
 }); // End GET /
 
 app.get("/signup", (req, res) => { // Registreringsside (viser skjema)
@@ -134,56 +183,104 @@ app.get("/login", (req, res) => { // Innloggingsside (viser skjema)
   res.render("login", { title: "Logg inn" }); // Renderer login.ejs med tittel
 }); // Slutt på GET /login
 
-app.get("/profile", requireLogin, (req, res) => { // Definerer GET /profile og beskytter den med requireLogin (må være innlogget)
+app.get("/profile", requireLogin, (req, res) => { // Definerer GET /profile og beskytter med requireLogin (må være innlogget)
   const userId = req.session.userId; // Leser innlogget bruker-ID fra session
 
-  const sql = `               -- Starter SQL-spørring som henter brukerinfo og antall poster
+  const userSql = `               -- SQL for å hente brukerinfo + postCount
     SELECT 
-      u.UserID,               -- Henter brukerens ID
-      u.username,             -- Henter brukernavn
-      u.email,                -- Henter e-post (valgfritt å vise)
-      u.created_at,           -- Henter tidspunkt for når brukeren ble opprettet
-      (SELECT COUNT(*)        -- Teller antall rader i Post-tabellen
-        FROM Post p 
-        WHERE p.UserID = u.UserID) AS postCount -- Gir antall poster brukeren har laget som postCount
-    FROM User u               -- Fra User-tabellen (alias u)
-    WHERE u.UserID = ?        -- Filtrerer på innlogget bruker
-  `; // Slutt på SQL-streng
+      u.UserID,                   -- Brukerens ID
+      u.username,                 -- Brukernavn
+      u.email,                    -- E-post (valgfritt å vise)
+      u.created_at,               -- Når brukeren ble opprettet
+      (SELECT COUNT(*) FROM Post p WHERE p.UserID = u.UserID AND p.ParentPostID IS NULL) AS postCount -- Antall toppnivå-innlegg
+    FROM User u                   -- Fra User-tabellen
+    WHERE u.UserID = ?            -- Filtrer på innlogget bruker
+  `; // Slutt SQL for bruker
 
-  db.get(sql, [userId], (err, user) => { // Kjører spørringen, forventer én rad (db.get)
-    if (err) { // Sjekker for databasefeil
+  db.get(userSql, [userId], (err, user) => { // Kjører spørringen for å hente bruker
+    if (err) { // Sjekker for DB-feil
       console.error(err); // Logger feilen
-      return res.status(500).send("Databasefeil"); // Returnerer 500 hvis DB-feil
-    } // Slutt på feil-sjekk
+      return res.status(500).send("Databasefeil"); // Returnerer 500 ved feil
+    } // Slutt feil-sjekk
 
-    if (!user) { // Hvis ingen bruker funnet (skulle ikke skje for gyldig session)
+    if (!user) { // Hvis ingen bruker funnet (bør ikke skje)
       return res.redirect("/logout"); // Logger ut hvis session er korrupt
-    } // Slutt på bruker-sjekk
+    } // Slutt bruker-sjekk
 
-    const postsSql = `    -- SQL for å hente ALLE poster som denne brukeren har laget
+    const postsSql = `            -- SQL for å hente ALLE toppnivå-innlegg som denne brukeren har laget
       SELECT 
-        p.PostID,         -- Postens ID
-        p.content,        -- Innhold i posten
-        p.created_at,     -- Når posten ble laget
-        p.likes,          -- Antall likes på posten
-        CASE WHEN l.UserID IS NULL THEN 0 ELSE 1 END AS liked -- Om innloggede bruker har likt posten (1/0)
-      FROM Post p         -- Fra Post-tabellen
-      LEFT JOIN PostLike l      -- Left-join for like-status
-        ON p.PostID = l.PostID AND l.UserID = ?   -- Sjekk like-status for den innloggede brukeren (viewer = deg selv)
-      WHERE p.UserID = ?        -- Filtrer på bruker
-      ORDER BY p.PostID DESC    -- Nyeste først
-    `; //Slutt SQL for poster
+        p.PostID,                 -- Postens ID
+        p.content,                -- Innhold i posten
+        p.created_at,             -- Når posten ble laget
+        (SELECT COUNT(*) FROM PostLike pl WHERE pl.PostID = p.PostID) AS likeCount, -- Antall likes (telles fra PostLike)
+        (SELECT COUNT(*) FROM Post c WHERE c.ParentPostID = p.PostID) AS commentCount, -- Antall kommentarer
+        CASE WHEN l.UserID IS NULL THEN 0 ELSE 1 END AS liked -- Om innlogget bruker (deg) har liket
+      FROM Post AS p              -- Fra Post-tabellen
+      LEFT JOIN PostLike AS l     -- Venstre-join for like-status for viewer (deg)
+        ON l.PostID = p.PostID 
+        AND l.UserID = ?           -- Sjekk like-status for deg selv
+      WHERE p.UserID = ?          -- Bare dine poster
+        AND p.ParentPostID IS NULL-- Kun toppnivå-innlegg (ikke kommentarer)
+      ORDER BY p.PostID DESC      -- Nyeste først
+    `; // Slutt SQL for poster
 
     db.all(postsSql, [userId, userId], (err2, posts) => { // Kjører spørringen for å hente poster
       if (err2) { // Sjekker for DB-feil
-        console.error(err2);  // Logger feilen
-        return res.status(500).send("Databasefeil");
-      } // sLutt feil-sjekk
+        console.error(err2); // Logger feilen
+        return res.status(500).send("Databasefeil"); // Returnerer 500 ved feil
+      } // Slutt feil-sjekk
 
-      res.render("profile", { title: "Profil", user, posts }); // Renderer profile.ejs og sender med user-objektet (inkl. postCount)
-    }); // Slutt db.all for poster
-  }); // Slutt på db.get callback
-}); // Slutt på GET /profile
+      if (posts.length === 0) { // Hvis brukeren ikke har noen toppnivå-innlegg
+        return res.render("profile", { // Renderer uten kommentarer
+          title: "Profil", // Side-tittel
+          user, // Bruker-objektet
+          posts: [], // Ingen poster
+          commentsByParent: {}, // Ingen kommentarer
+          userId: req.session.userId || null // Sender userId til view (kan brukes i header/script)
+        }); // Slutt render
+      } // Slutt hvis ingen poster
+
+      const parentIds = posts.map(p => p.PostID); // Samler alle PostID for å hente kommentarene
+      const placeholders = parentIds.map(() => "?").join(","); // Lager (?, ?, ?) for IN-klausul
+
+      const commentsSql = `       -- SQL for å hente ALLE kommentarer til disse postene i ett kall
+        SELECT
+          c.PostID,               -- Kommentarens ID (også PostID)
+          c.ParentPostID,         -- ID til toppnivå-posten kommentaren hører til
+          c.content,              -- Kommentar-tekst
+          c.created_at,           -- Når kommentaren ble laget
+          u.username              -- Forfatterens brukernavn
+        FROM Post AS c
+        JOIN User AS u ON u.UserID = c.UserID
+        WHERE c.ParentPostID IN (${placeholders}) -- Bare kommentarer til brukerens toppnivå-innlegg
+        ORDER BY c.created_at ASC                 -- Eldst → nyest for naturlig leserekkefølge
+      `; // Slutt SQL for kommentarer
+
+      db.all(commentsSql, parentIds, (err3, comments) => { // Kjører spørringen for å hente kommentarer
+        if (err3) { // Sjekker for DB-feil
+          console.error(err3); // Logger feilen
+          return res.status(500).send("Databasefeil"); // Returnerer 500 ved feil
+        } // Slutt feil-sjekk
+
+        const commentsByParent = {}; // Lager et oppslagsobjekt: parentId -> liste av kommentarer
+        for (const c of comments) { // Går gjennom alle kommentarer
+          const pid = c.ParentPostID; // Leser parent-id
+          if (!commentsByParent[pid]) commentsByParent[pid] = []; // Oppretter liste hvis mangler
+          commentsByParent[pid].push(c); // Legger kommentaren inn i lista til riktig parent
+        } // Slutt løkke
+
+        // Renderer profile.ejs med både user, posts og commentsByParent
+        res.render("profile", { // Renderer profilen
+          title: "Profil", // Side-tittel
+          user, // Brukerinfo
+          posts, // Dine toppnivå-innlegg
+          commentsByParent, // Kommentarer gruppert per parent
+          userId: req.session.userId || null // Sender userId til view
+        }); // Slutt render
+      }); // Slutt db.all (kommentarer)
+    }); // Slutt db.all (poster)
+  }); // Slutt db.get (bruker)
+}); // Slutt GET /profile
 
 app.get("/logout", (req, res) => { // Logg ut via link (HTML-rute)
   req.session.destroy((err) => { // Ødelegger sesjonen på serveren
@@ -290,90 +387,130 @@ app.post("/api/auth/logout", (req, res) => { // Utlogging via API (JSON)
   }); // Slutt på destroy callback
 }); // Slutt på POST /api/auth/logout
 
-app.post("/api/posts/:postId/like", requireApiLogin, (req, res) => { // Definerer API for å toggle like/unlike, krever innlogging
-  const raw = req.params.postId; // Leser postId som tekst fra URL-parameter
-  const postId = Number(raw); // Konverterer til tall (f.eks. "3" -> 3)
-  if (!Number.isInteger(postId) || postId <= 0) { // Validerer at postId er et positivt heltall
-    return res.status(400).json({ ok: false, error: "Invalid postId" }); // Returnerer 400 hvis ugyldig
-  } // Slutt på validering
+app.post("/api/posts/:postId/like", requireApiLogin, (req, res) => { // Toggle like/unlike for en post
+  const postId = Number(req.params.postId); // Leser PostID fra URL
+  if (!Number.isInteger(postId) || postId <= 0) { // Validerer at id er gyldig
+    return res.status(400).json({ ok: false, error: "Invalid postId" }); // 400 ved feil id
+  } // Slutt validering
 
-  const userId = req.session.userId; // Leser innlogget bruker-ID fra session
-  const now = new Date().toISOString(); // Lager tidsstempel for like-raden
+  const userId = req.session.userId; // Leser innlogget bruker-ID
+  db.run( // Prøver å LIKE først
+    "INSERT OR IGNORE INTO PostLike (UserID, PostID) VALUES (?, ?)", // Setter inn rad hvis den ikke finnes
+    [userId, postId], // Verdier for like
+    function (insErr) { // Callback etter INSERT OR IGNORE
+      if (insErr) { // DB-feil
+        console.error("INSERT OR IGNORE PostLike feil:", insErr.message); // Logger
+        return res.status(500).json({ ok: false, error: "Databasefeil" }); // 500
+      } // Slutt feil-sjekk
 
-  // 1) Prøv å LIKE: sett inn rad i PostLike, men ignorer hvis den finnes fra før
-  db.run( // Kjører en INSERT OR IGNORE for å unngå UNIQUE-konflikt når like finnes
-    "INSERT OR IGNORE INTO PostLike (UserID, PostID) VALUES (?, ?)", // SQL for å prøve å like
-    [userId, postId], // Verdier: innlogget bruker, aktuell post
-    function (insErr) { // Callback etter at INSERT OR IGNORE er kjørt
-      if (insErr) { // Sjekker om det oppstod databasefeil ved INSERT
-        console.error("Error INSERT OR IGNORE PostLike:", insErr.message); // Logger detaljert feil
-        return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500 ved DB-feil
-      } // Slutt på feil-sjekk
+      const didInsert = this.changes === 1; // true hvis vi nettopp liket (rad ble lagt til)
 
-      if (this.changes === 1) { // Hvis én rad ble satt inn nå: brukeren har nettopp LIKET
-        db.run( // Øker likes-telleren i Post-tabellen
-          "UPDATE Post SET likes = likes + 1 WHERE PostID = ?", // SQL for å inkrementere likes
-          [postId], // Parameter: aktuell post
-          function (updErr) { // Callback etter UPDATE
-            if (updErr) { // Sjekker for DB-feil ved UPDATE
-              console.error("Error UPDATE Post (like):", updErr.message); // Logger feil
-              return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500 ved DB-feil
-            } // Slutt på feil-sjekk
-            db.get( // Leser oppdatert likes-verdi for å returnere til klient
-              "SELECT likes FROM Post WHERE PostID = ?", // SQL for å hente likes
-              [postId], // Parameter: aktuell post
-              (cntErr, row) => { // Callback etter SELECT
-                if (cntErr) { // Sjekker for feil ved SELECT
-                  console.error("Error SELECT likes (like):", cntErr.message); // Logger feil
-                  return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500 ved DB-feil
-                } // Slutt på feil-sjekk
-                return res.status(200).json({ ok: true, liked: true, likes: row.likes }); // Svar: LIKET, med ny teller
-              } // Slutt på callback
-            ); // Slutt på db.get
-          } // Slutt på callback
-        ); // Slutt på db.run (UPDATE)
-        return; // Avslutter her når LIKE ble gjort
-      } // Slutt på if (this.changes === 1)
+      const afterCount = () => { // Hjelpefunksjon for å lese og returnere ny count
+        db.get( // Leser oppdatert antall likes direkte fra PostLike
+          "SELECT COUNT(*) AS c FROM PostLike WHERE PostID = ?", // Teller likes
+          [postId], // For aktuell post
+          (cntErr, row) => { // Callback etter SELECT
+            if (cntErr) { // DB-feil
+              console.error("COUNT PostLike feil:", cntErr.message); // Logger
+              return res.status(500).json({ ok: false, error: "Databasefeil" }); // 500
+            } // Slutt feil-sjekk
+            return res.status(200).json({ ok: true, liked: didInsert, likes: row.c }); // Svarer med liked + ny teller
+          } // Slutt callback
+        ); // Slutt db.get
+      }; // Slutt afterCount
 
-      // 2) Hvis INSERT ikke gjorde endringer: raden fantes => brukeren har allerede liket → gjør UNLIKE
-      db.run( // Sletter like-raden for å un-like
-        "DELETE FROM PostLike WHERE UserID = ? AND PostID = ?", // SQL for å fjerne like
-        [userId, postId], // Parametere: innlogget bruker og aktuell post
+      if (didInsert) { // Vi liket nå → bare returner ny count
+        return afterCount(); // Returnerer liked=true og ny teller
+      } // Slutt if (didInsert)
+
+      // Hvis vi ikke satte inn rad (fantes fra før), gjør UNLIKE
+      db.run( // Fjerner like-raden
+        "DELETE FROM PostLike WHERE UserID = ? AND PostID = ?", // SQL for å unlike
+        [userId, postId], // Parametere
         function (delErr) { // Callback etter DELETE
-          if (delErr) { // Sjekker for DB-feil ved DELETE
-            console.error("Error DELETE PostLike (unlike):", delErr.message); // Logger feil
-            return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500 ved DB-feil
-          } // Slutt på feil-sjekk
-          if (this.changes === 0) { // Hvis ingen rader ble slettet (uvanlig, men mulig ved inkonsistens)
-            return res.status(200).json({ ok: true, liked: false, likes: undefined }); // Returnerer liked=false uten teller
-          } // Slutt på if (this.changes === 0)
+          if (delErr) { // DB-feil ved DELETE
+            console.error("DELETE PostLike feil:", delErr.message); // Logger
+            return res.status(500).json({ ok: false, error: "Databasefeil" }); // 500
+          } // Slutt feil-sjekk
+          return afterCount(); // Returnerer liked=false og ny teller
+        } // Slutt callback
+      ); // Slutt db.run
+    } // Slutt callback
+  ); // Slutt db.run
+}); // Slutt POST /api/posts/:postId/like
 
-          db.run( // Reduserer likes-telleren, men ikke under 0
-            "UPDATE Post SET likes = CASE WHEN likes > 0 THEN likes - 1 ELSE 0 END WHERE PostID = ?", // SQL for å decrementere
-            [postId], // Parameter: aktuell post
-            function (updErr2) { // Callback etter UPDATE
-              if (updErr2) { // Sjekker for DB-feil ved UPDATE
-                console.error("Error UPDATE Post (unlike):", updErr2.message); // Logger feil
-                return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500 ved DB-feil
-              } // Slutt på feil-sjekk
-              db.get( // Leser oppdatert likes-verdi
-                "SELECT likes FROM Post WHERE PostID = ?", // SQL for å hente likes
-                [postId], // Parameter: aktuell post
-                (cntErr2, row2) => { // Callback etter SELECT
-                  if (cntErr2) { // Sjekker for feil ved SELECT
-                    console.error("Error SELECT likes (unlike):", cntErr2.message); // Logger feil
-                    return res.status(500).json({ ok: false, error: "Databasefeil" }); // Returnerer 500 ved DB-feil
-                  } // Slutt på feil-sjekk
-                  return res.status(200).json({ ok: true, liked: false, likes: row2.likes }); // Svar: UNLIKET, med ny teller
-                } // Slutt på callback
-              ); // Slutt på db.get
-            } // Slutt på callback
-          ); // Slutt på db.run (UPDATE)
-        } // Slutt på callback
-      ); // Slutt på db.run (DELETE)
-    } // Slutt på callback for INSERT OR IGNORE
-  ); // Slutt på db.run (INSERT OR IGNORE)
-}); // Slutt på POST /api/posts/:postId/like
+app.post("/api/posts/:postId/comments", requireApiLogin, (req, res) => { // API to create a comment on a post
+  const parentId = Number(req.params.postId); // Parses parent PostID from URL
+  if (!Number.isInteger(parentId) || parentId <= 0) { // Validates parent id
+    return res.status(400).json({ ok: false, error: "Invalid postId" }); // 400 if invalid
+  } // End validation
+
+  const { content } = req.body; // Reads comment text from JSON body
+  if (!content || !content.trim()) { // Validates content presence
+    return res.status(400).json({ ok: false, error: "Comment cannot be empty" }); // 400 if empty
+  } // End validation
+
+  // Normalise content so we don’t create huge blank areas
+  const normalised = content                  // Takes raw content
+    .replace(/\r\n/g, "\n")                   // Normalises CRLF to LF
+    .replace(/\n{3,}/g, "\n\n")               // Collapses 3+ blank lines to max 2
+    .trim();                                  // Trims surrounding whitespace
+
+  const createdAt = new Date().toISOString(); // ISO timestamp for the comment
+  const userId = req.session.userId; // Current logged-in user id
+
+  // Insert this comment as a Post row with ParentPostID = parentId
+  db.run(
+    "INSERT INTO Post (UserID, content, created_at, ParentPostID) VALUES (?, ?, ?, ?)", // Insert comment as a Post
+    [userId, normalised, createdAt, parentId], // Values: author, text, time, parent
+    function (insErr) { // Callback after INSERT
+      if (insErr) { // DB error
+        console.error("Error INSERT comment:", insErr.message); // Log error
+        return res.status(500).json({ ok: false, error: "Databasefeil" }); // 500 on error
+      } // End error handling
+
+      const newCommentId = this.lastID; // Gets the new PostID for the comment
+
+      // Read the username for the author and compute the parent’s new comment count
+      const selectSql = ` 
+        SELECT 
+          p.PostID,               -- The comment id
+          p.ParentPostID,         -- The parent post id
+          p.content,              -- The comment content
+          p.created_at,           -- The comment timestamp
+          u.username              -- The author username
+        FROM Post AS p
+        JOIN User AS u ON u.UserID = p.UserID
+        WHERE p.PostID = ?
+      `; // End SQL
+
+      db.get(selectSql, [newCommentId], (selErr, commentRow) => { // Fetch the newly created comment with username
+        if (selErr) { // DB error on select
+          console.error("Error SELECT new comment:", selErr.message); // Log
+          return res.status(500).json({ ok: false, error: "Databasefeil" }); // 500
+        } // End error handling
+
+        db.get( // Counts how many comments this parent now has
+          "SELECT COUNT(*) AS c FROM Post WHERE ParentPostID = ?",
+          [parentId],
+          (cntErr, countRow) => {
+            if (cntErr) { // DB error on count
+              console.error("Error COUNT comments:", cntErr.message); // Log
+              return res.status(500).json({ ok: false, error: "Databasefeil" }); // 500
+            } // End error handling
+
+            // Return the new comment and updated commentCount for the parent
+            return res.status(201).json({ // 201 Created
+              ok: true, // Success flag
+              comment: commentRow, // The newly inserted comment (with username)
+              commentCount: countRow.c // The parent’s updated comment count
+            }); // End JSON response
+          } // End count callback
+        ); // End db.get(count)
+      }); // End db.get(select new comment)
+    } // End insert callback
+  ); // End db.run(insert)
+}); // End POST /api/posts/:postId/comments
 
 //----------------------//
 //     API: POSTS       //

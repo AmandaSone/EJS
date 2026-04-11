@@ -89,11 +89,11 @@ form button:hover { /* Hover-stil for knappen */
   margin-top: 16px; /* Luft over lista */
 } /* Slutt på .posts-list */
 
-.post-content {
-  white-space: pre-wrap;
-  overflow: anywhere;
-  word-break: break-word;
-}
+.post-content { /* Text inside a post or comment */
+  white-space: pre-line; /* Show line breaks from the textarea, but collapse extra spaces */
+  overflow-wrap: anywhere; /* Break very long words/URLs to prevent horizontal overflow */
+  word-break: break-word; /* Extra safety for long tokens */
+} /* End .post-content */
 
 /* Én post-boks */
 .post-box { /* Boks som omslutter en enkelt post */
@@ -107,3 +107,76 @@ form button:hover { /* Hover-stil for knappen */
 textarea {
   resize: none;
 }
+
+/* ---------- ACTIONS ROW (LIKE + COMMENT COUNT) ---------- */
+.actions-row { /* Row holding the like button and the comment count */
+  display: flex; /* Place items in a single row */
+  align-items: center; /* Vertically center items */
+  gap: 12px; /* Space between items */
+  margin-top: 4px; /* Small space above the row */
+} /* End .actions-row */
+
+.comment-count { /* The number showing how many comments a post has */
+  font-size: 0.95em; /* Slightly smaller than body text */
+  color: #555; /* Subtle color to deemphasize */
+} /* End .comment-count */
+
+/* ---------- INLINE COMMENT FORM ---------- */
+.comment-form-row { /* Row with the comment textarea and Send button */
+  margin-top: 8px; /* Space above the form */
+  display: flex; /* Place textarea and button on one line */
+  gap: 8px; /* Space between textarea and button */
+  align-items: flex-start; /* Align tops so the textarea can grow downward */
+} /* End .comment-form-row */
+
+.comment-input { /* The small inline textarea for comments */
+  flex: 1; /* Take the remaining width in the row */
+  min-height: 36px; /* Comfortable starting height */
+  line-height: 1.4; /* Readable line height */
+  padding: 8px; /* Inner padding for readability */
+  border: 1px solid #ccc; /* Light border to match your form textarea */
+  background: #fff; /* White background like other inputs */
+  resize: none; /* We auto-grow with JS, so disable manual resize */
+  overflow: hidden; /* Hide scrollbars; height grows via JS */
+} /* End .comment-input */
+
+.comment-send { /* The Send button next to the comment input */
+  padding: 8px 12px; /* Clickable area */
+  border: 1px solid #bbb; /* Thin border like your form button */
+  background: #fff; /* White background for consistency */
+  cursor: pointer; /* Pointer cursor on hover */
+} /* End .comment-send */
+
+.comment-send:hover { /* Hover effect for the Send button */
+  background: #f7f7f7; /* Subtle hover color, like your form button */
+} /* End .comment-send:hover */
+
+/* ---------- COMMENTS LIST ---------- */
+.comment-list { /* Container for all comments under a post */
+  margin-top: 8px; /* Space above the comment list */
+} /* End .comment-list */
+
+.comment { /* One comment block */
+  font-size: 0.95em; /* Slightly smaller than the post text */
+  opacity: 0.95; /* Subtle visual separation */
+  margin: 6px 0; /* Space between comments */
+} /* End .comment */
+
+.comment-header { /* The first line of a comment: author + time */
+  margin: 0; /* Remove default paragraph margin */
+} /* End .comment-header */
+
+.hidden { /* Utility class that hides an element */
+  display: none; /* Hides the element from layout */
+}
+
+.comments-toggle { /* Makes the comments toggle look like a link */
+  background: none; /* No background */
+  border: 0; /* No border */
+  padding: 0; /* No padding */
+  color: #0a66c2; /* Link-like color */
+  text-decoration: underline; /* Underlined text */
+  cursor: pointer; /* Pointer cursor on hover */
+  font: inherit; /* Inherit font from parent */
+}
+
