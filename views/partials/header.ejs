@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Responsiv visning -->
     <title><%= (typeof title !== 'undefined' && title) ? title : 'Min app' %></title> <!-- Bruker side-tittel eller fallback -->
     <link rel="stylesheet" href="/styles.css"> <!-- Laster minimal CSS fra /public/styles.css -->
+    <script src="/js/client.js" defer></script> <!-- Laster felles klientscript fra /public/js/client.js etter HTML-en er lastet -->
 </head> <!-- Slutt head -->
 <body> <!-- Starter body-innhold -->
 
@@ -15,11 +16,15 @@
             <a href="/">Min app</a> <!-- Enkel hjem-lenke med navn -->
         </div> <!-- Slutt brand -->
         <div class="links"> <!-- Område for nav-lenker -->
-            <a href="/">Home</a> <!-- Lenke til forsiden -->
-            <a href="/signup">Sign Up</a> <!-- Lenke til registrering -->
-            <a href="/login">Login</a> <!-- Lenke til innlogging -->
-            <a href="/profile">Profile</a> <!-- Lenke til profil -->
-            <!-- Du kan senere bytte ut Login/Sign Up med Logout når innlogget -->
+            <a href="/">Latest</a> <!-- Lenke til forsiden -->
+            <a href="/trending">Trending</a>
+            <% if (typeof userId !== 'undefined' && userId) { %>
+                <a href="/profile">Profile</a> <!-- Lenke til profil -->
+                <a href="/logout">Logout</a> <!-- Logg ut -->
+            <% } else { %>
+                <a href="/signup">Sign Up</a> <!-- Lenke til registrering -->
+                <a href="/login">Login</a> <!-- Lenke til innlogging -->
+            <% } %>
         </div> <!-- Slutt links -->
     </nav> <!-- Slutt nav -->
     </div> <!-- Slutt container -->

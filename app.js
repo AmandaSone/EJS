@@ -312,6 +312,84 @@ app.post("/add-post", requireLogin, (req, res) => { // Lager ny post via HTML-sk
   ); // Slutt på db.run
 }); // Slutt på POST /add-post
 
+app.get("/trending", (req, res) => { // Definerer GET /trending for "mest engasjement"
+  const viewerId = req.session.userId || -1; // Leser innlogget bruker-ID eller -1 (matcher ingen like-rader)
+
+  const postsSql = `                       -- SQL for å hente toppnivå-innlegg med like- og kommentar-teller
+    SELECT
+      p.PostID,                             -- Postens ID
+      p.content,                            -- Innhold
+      p.created_at,                         -- Når innlegget ble laget
+      u.username,                           -- Forfatterens brukernavn
+      (SELECT COUNT(*) FROM PostLike pl 
+        WHERE pl.PostID = p.PostID) AS likeCount,    -- Antall likes for denne posten
+      (SELECT COUNT(*) FROM Post c 
+        WHERE c.ParentPostID = p.PostID) AS commentCount, -- Antall kommentarer for denne posten
+      CASE WHEN l.UserID IS NULL THEN 0 ELSE 1 END AS liked -- Om viewer har liket (1/0)
+    FROM Post AS p                          -- Leser fra Post-tabellen
+    JOIN User AS u                           -- Joiner med User for forfatternavn
+      ON u.UserID = p.UserID                 -- Knytt Post->User
+    LEFT JOIN PostLike AS l                  -- Venstrejoin for å sjekke om viewer har liket
+      ON l.PostID = p.PostID AND l.UserID = ? -- Samme post + viewer
+    WHERE p.ParentPostID IS NULL             -- Kun toppnivå (ikke kommentarer)
+    ORDER BY (likeCount + commentCount) DESC, -- Sorter synkende på sum likes+kommentarer
+            p.created_at DESC               -- Ved lik score, nyeste først (valgfri tie-breaker)
+  `; // Slutt SQL
+
+  db.all(postsSql, [viewerId], (err, topPosts) => { // Kjører spørringen med viewerId
+    if (err) { // Feilhåndtering for DB
+      console.error("SQL-feil i GET /trending (posts):", err.message); // Logger detaljert
+      return res.status(500).send("Databasefeil"); // Sender 500 ved feil
+    } // Slutt feil-sjekk
+
+    if (topPosts.length === 0) { // Hvis ingen poster å vise
+      return res.render("trending", {               // Renderer tom liste
+        posts: [],                                  // Ingen poster
+        commentsByParent: {},                       // Ingen kommentarer
+        title: "Trending",                          // Side-tittel
+        userId: req.session.userId || null          // Sender videre userId for UI
+      }); // Slutt render
+    } // Slutt tom-tilfelle
+
+    const parentIds = topPosts.map(p => p.PostID); // Samler PostID for alle toppnivå
+    const placeholders = parentIds.map(() => "?").join(","); // Lager (?, ?, ?) til IN-klausul
+
+    const commentsSql = `                   -- Henter alle kommentarer for disse postene i ett kall
+      SELECT
+        c.PostID,                           -- Kommentarens id (også PostID)
+        c.ParentPostID,                     -- Hvilken topp-post den tilhører
+        c.content,                          -- Kommentar-tekst
+        c.created_at,                       -- Tidsstempel for kommentar
+        u.username                          -- Forfatterens brukernavn
+      FROM Post AS c                        -- Kommentarer er rader i Post med ParentPostID satt
+      JOIN User AS u ON u.UserID = c.UserID -- Join for forfatter
+      WHERE c.ParentPostID IN (${placeholders}) -- Bare kommentarer til utvalgte toppposter
+      ORDER BY c.created_at ASC             -- Eldst -> nyest for naturlig lesing
+    `; // Slutt SQL
+
+    db.all(commentsSql, parentIds, (err2, comments) => { // Kjører kommentarspørringen
+      if (err2) { // Feilhåndtering DB
+        console.error("SQL-feil i GET /trending (comments):", err2.message); // Logger feil
+        return res.status(500).send("Databasefeil"); // Sender 500 ved feil
+      } // Slutt feil-sjekk
+
+      const commentsByParent = {}; // Lager grouping: parentId -> liste av kommentarer
+      for (const c of comments) { // Går gjennom alle kommentarer
+        const pid = c.ParentPostID; // Leser parent-ID
+        if (!commentsByParent[pid]) commentsByParent[pid] = []; // Oppretter liste hvis mangler
+        commentsByParent[pid].push(c); // Legger kommentaren i riktig liste
+      } // Slutt grouping
+
+      res.render("trending", {                 // Renderer trending.ejs
+        posts: topPosts,                       // Sender toppposter med tellerne/liked
+        commentsByParent,                      // Sender kommentarene gruppert
+        title: "Trending",                     // Side-tittel
+        userId: req.session.userId || null     // Gjør userId tilgjengelig for view
+      }); // Slutt render
+    }); // Slutt db.all (comments)
+  }); // Slutt db.all (posts)
+}); // Slutt GET /trending
+
 //----------------------//
 //     API: AUTH        //
 //----------------------//
