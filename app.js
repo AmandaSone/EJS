@@ -217,7 +217,7 @@ app.get("/login", (req, res) => { // Innloggingsside (viser skjema)
   res.render("login", { title: "Logg inn" }); // Renderer login.ejs med tittel
 }); // Slutt på GET /login
 
-app.get("/profile", requireLogin, (req, res) => { // Definerer GET /profile og beskytter med requireLogin (må være innlogget)
+app.get("/profile", requireLogin, (req, res) => { // Definerer GET /profile og beskytter den med requireLogin (må være innlogget)
   const userId = req.session.userId; // Leser innlogget bruker-ID fra session
 
   const userSql = `               -- SQL for å hente brukerinfo + postCount
@@ -233,7 +233,7 @@ app.get("/profile", requireLogin, (req, res) => { // Definerer GET /profile og b
 
   db.get(userSql, [userId], (err, user) => { // Kjører spørringen for å hente bruker
     if (err) { // Sjekker for DB-feil
-      console.error(err); // Logger feilen
+      console.error(err.message); // Logger feilmelding
       return res.status(500).send("Databasefeil"); // Returnerer 500 ved feil
     } // Slutt feil-sjekk
 
@@ -252,7 +252,7 @@ app.get("/profile", requireLogin, (req, res) => { // Definerer GET /profile og b
       FROM Post AS p              -- Fra Post-tabellen
       LEFT JOIN PostLike AS l     -- Venstre-join for like-status for viewer (deg)
         ON l.PostID = p.PostID 
-        AND l.UserID = ?           -- Sjekk like-status for deg selv
+       AND l.UserID = ?           -- Sjekk like-status for deg selv
       WHERE p.UserID = ?          -- Bare dine poster
         AND p.ParentPostID IS NULL-- Kun toppnivå-innlegg (ikke kommentarer)
       ORDER BY p.PostID DESC      -- Nyeste først
@@ -260,7 +260,7 @@ app.get("/profile", requireLogin, (req, res) => { // Definerer GET /profile og b
 
     db.all(postsSql, [userId, userId], (err2, posts) => { // Kjører spørringen for å hente poster
       if (err2) { // Sjekker for DB-feil
-        console.error(err2); // Logger feilen
+        console.error(err2.message); // Logger feilmelding
         return res.status(500).send("Databasefeil"); // Returnerer 500 ved feil
       } // Slutt feil-sjekk
 
@@ -270,7 +270,8 @@ app.get("/profile", requireLogin, (req, res) => { // Definerer GET /profile og b
           user, // Bruker-objektet
           posts: [], // Ingen poster
           commentsByParent: {}, // Ingen kommentarer
-          userId: req.session.userId || null // Sender userId til view (kan brukes i header/script)
+          userId: req.session.userId || null, // Viewer ID til view
+          isOwnProfile: true // VIKTIG: egen profil → vis Logout/Delete
         }); // Slutt render
       } // Slutt hvis ingen poster
 
@@ -292,7 +293,7 @@ app.get("/profile", requireLogin, (req, res) => { // Definerer GET /profile og b
 
       db.all(commentsSql, parentIds, (err3, comments) => { // Kjører spørringen for å hente kommentarer
         if (err3) { // Sjekker for DB-feil
-          console.error(err3); // Logger feilen
+          console.error(err3.message); // Logger feilmelding
           return res.status(500).send("Databasefeil"); // Returnerer 500 ved feil
         } // Slutt feil-sjekk
 
@@ -309,7 +310,8 @@ app.get("/profile", requireLogin, (req, res) => { // Definerer GET /profile og b
           user, // Brukerinfo
           posts, // Dine toppnivå-innlegg
           commentsByParent, // Kommentarer gruppert per parent
-          userId: req.session.userId || null // Sender userId til view
+          userId: req.session.userId || null, // Viewer ID til view
+          isOwnProfile: true // VIKTIG: egen profil → vis Logout/Delete
         }); // Slutt render
       }); // Slutt db.all (kommentarer)
     }); // Slutt db.all (poster)
@@ -423,6 +425,175 @@ app.get("/trending", (req, res) => { // Definerer GET /trending for "mest engasj
     }); // Slutt db.all (comments)
   }); // Slutt db.all (posts)
 }); // Slutt GET /trending
+
+app.get("/u/:username", (req, res) => {                               // Definerer offentlig profilside på /u/:username
+  const viewerId = req.session.userId || -1;                           // Leser innlogget bruker-ID (eller -1 hvis utlogget)
+  const handle = req.params.username;                                  // Leser brukernavn fra URL
+
+  const userSql = `
+    SELECT
+      u.UserID,
+      u.username,
+      u.email,
+      u.created_at,
+      (SELECT COUNT(*) FROM Post p WHERE p.UserID = u.UserID AND p.ParentPostID IS NULL) AS postCount
+    FROM User AS u
+    WHERE u.username = ?
+  `;
+
+  db.get(userSql, [handle], (err, user) => {
+    if (err) {
+      console.error("Public profile: user SQL error:", err.message); // Logg konkret
+      return res.status(500).send("Databasefeil");
+    }
+    if (!user) {                                                       // Hvis ingen bruker med dette navnet
+      return res.status(404).send("User not found");                   // 404: ikke funnet
+    }                                                                  // Slutt ikke funnet
+
+    const postsSql = `
+      SELECT
+        p.PostID,
+        p.content,
+        p.created_at,
+        (SELECT COUNT(*) FROM PostLike pl WHERE pl.PostID = p.PostID) AS likeCount,
+        (SELECT COUNT(*) FROM Post c WHERE c.ParentPostID = p.PostID) AS commentCount,
+        CASE WHEN l.UserID IS NULL THEN 0 ELSE 1 END AS liked
+      FROM Post AS p
+      LEFT JOIN PostLike AS l
+        ON l.PostID = p.PostID AND l.UserID = ?
+      WHERE p.UserID = ?
+        AND p.ParentPostID IS NULL
+      ORDER BY p.PostID DESC
+    `;
+
+    db.all(postsSql, [viewerId, user.UserID], (err2, posts) => {
+      if (err2) {
+        console.error("Public profile: posts SQL error:", err2.message); // Logg konkret
+        return res.status(500).send("Databasefeil");
+    }
+
+      if (posts.length === 0) {                                        // Hvis ingen poster
+        return res.render("profile", {                                 // Renderer profile.ejs
+          title: user.username,                                        // Setter tittel til brukernavn
+          user,                                                        // Sender bruker-objektet
+          posts: [],                                                   // Ingen poster
+          commentsByParent: {},                                        // Ingen kommentarer
+          userId: req.session.userId || null,                          // Viewer ID
+          isOwnProfile: false                                          // Viktig: dette er IKKE min egen profil
+        });                                                            // Slutt render
+      }                                                                // Slutt ingen poster
+
+      const commentsSql = `
+        SELECT
+          c.PostID,
+          c.ParentPostID,
+          c.content,
+          c.created_at,
+          u.username
+        FROM Post AS c
+        JOIN User AS u ON u.UserID = c.UserID
+        WHERE EXISTS (
+          SELECT 1
+          FROM Post AS p
+          WHERE p.PostID = c.ParentPostID
+            AND p.UserID = ?
+            AND p.ParentPostID IS NULL
+        )
+        ORDER BY c.created_at ASC
+      `;
+
+      db.all(commentsSql, [user.UserID], (err3, comments) => {
+        if (err3) {
+          console.error("Public profile: comments SQL error:", err3.message); // Logg konkret
+          return res.status(500).send("Databasefeil");
+        }
+
+        const commentsByParent = {};
+        for (const c of comments) {
+          const pid = c.ParentPostID;
+          if (!commentsByParent[pid]) commentsByParent[pid] = [];
+          commentsByParent[pid].push(c);
+        }
+
+        return res.render("profile", {
+          title: user.username,
+          user,
+          posts,
+          commentsByParent,
+          userId: req.session.userId || null,
+          isOwnProfile: false
+        });                                                            // Slutt render
+      });                                                              // Slutt db.all (comments)
+    });                                                                // Slutt db.all (posts)
+  });                                                                  // Slutt db.get (user)
+});
+
+app.post("/api/auth/delete-account", requireApiLogin, (req, res) => { // Definerer en POST-API for å slette innlogget bruker
+  const userId = req.session.userId; // Leser innlogget bruker-ID fra session
+
+  // Hjelpefunksjon for å rulle tilbake transaksjonen og svare med 500
+  const rollback = (label, err) => { // Definerer en liten funksjon for rollback og logging
+    console.error(label, err && err.message ? err.message : err); // Logger feilmelding med label
+    db.run("ROLLBACK", () => { // Ruller tilbake transaksjonen
+      return res.status(500).json({ ok: false, error: "Databasefeil" }); // Svarer 500 til klient
+    }); // Slutt ROLLBACK
+  }; // Slutt rollback
+
+  db.serialize(() => { // Kjører de neste db.run-kallene sekvensielt
+    db.run("BEGIN TRANSACTION", (err) => { // Starter en eksplisitt transaksjon
+      if (err) return rollback("BEGIN TRANSACTION error:", err); // Ruller tilbake ved feil
+
+      // 1) Slett likes på alle poster som tilhører brukeren (inkl. kommentarer under brukerens poster)
+      const sqlDelLikesOnUserPosts = `
+        DELETE FROM PostLike
+        WHERE PostID IN (
+          SELECT PostID FROM Post WHERE UserID = ?
+          UNION
+          SELECT c.PostID FROM Post c
+          WHERE c.ParentPostID IN (SELECT p.PostID FROM Post p WHERE p.UserID = ?)
+        )
+      `; // SQL som sletter likes tilknyttet alle brukerens poster (topp + barns kommentarer)
+      db.run(sqlDelLikesOnUserPosts, [userId, userId], function (err1) { // Kjører slettingen med to ganger userId
+        if (err1) return rollback("Delete likes on user's posts error:", err1); // Rollback ved feil
+
+        // 2) Slett brukerens egne likes (på andres poster)
+        db.run("DELETE FROM PostLike WHERE UserID = ?", [userId], function (err2) { // Sletter alle likes laget av brukeren
+          if (err2) return rollback("Delete user's own likes error:", err2); // Rollback ved feil
+
+          // 3) Slett kommentarer under brukerens toppnivå-innlegg (postene til andre som svar på dine innlegg)
+          const sqlDelCommentsUnderUserTopPosts = `
+            DELETE FROM Post
+            WHERE ParentPostID IN (SELECT PostID FROM Post WHERE UserID = ?)
+          `; // SQL som sletter alle kommentarer som henger på brukerens topp-innlegg
+          db.run(sqlDelCommentsUnderUserTopPosts, [userId], function (err3) { // Kjører slettingen
+            if (err3) return rollback("Delete comments under user's posts error:", err3); // Rollback ved feil
+
+            // 4) Slett alle brukerens egne poster (topp og kommentarer skrevet av brukeren)
+            db.run("DELETE FROM Post WHERE UserID = ?", [userId], function (err4) { // Sletter alle Post-rader eid av brukeren
+              if (err4) return rollback("Delete user's posts error:", err4); // Rollback ved feil
+
+              // 5) Slett selve brukeren
+              db.run("DELETE FROM User WHERE UserID = ?", [userId], function (err5) { // Sletter User-raden
+                if (err5) return rollback("Delete user error:", err5); // Rollback ved feil
+
+                // 6) Commit transaksjonen og ødelegg session
+                db.run("COMMIT", (err6) => { // Forsegler endringene
+                  if (err6) return rollback("COMMIT error:", err6); // Rollback ved feil på commit
+
+                  // Ødelegg session og svar OK
+                  req.session.destroy(() => { // Fjerner sesjonen fra server
+                    res.clearCookie("connect.sid"); // Sletter session-cookien i nettleseren
+                    return res.status(200).json({ ok: true, message: "Account deleted" }); // Svarer 200 OK
+                  }); // Slutt destroy
+                }); // Slutt COMMIT
+              }); // Slutt delete User
+            }); // Slutt delete Post (by user)
+          }); // Slutt delete comments under user's posts
+        }); // Slutt delete user's own likes
+      }); // Slutt delete likes on user's posts
+    }); // Slutt BEGIN TRANSACTION
+  }); // Slutt serialize
+}); // Slutt POST /api/auth/delete-account
 
 //----------------------//
 //     API: AUTH        //

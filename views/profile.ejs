@@ -1,24 +1,32 @@
-<%- include('partials/header', { title: "Profile" }) %> <!-- Inkluderer header-partial med tittel -->
+<%- include('partials/header', { title: (typeof title !== 'undefined' ? title : 'Profile') }) %> <!-- Header -->
 
-<h1>My Profile</h1> <!-- Overskrift for profilsiden -->
+<% if (typeof isOwnProfile !== 'undefined' && isOwnProfile) { %>       <!-- Hvis min egen profil -->
+  <h1>My Profile</h1>                                                  <!-- Egen overskrift -->
+<% } else { %>                                                         <!-- Annen brukers profil -->
+  <h1><%= user.username %></h1>                                        <!-- Vis brukernavn som overskrift -->
+<% } %>
 
-<div> <!-- Starter en container for brukerinfo -->
-    <p><strong>Username:</strong> <%= user.username %></p> <!-- Viser brukernavn -->
-    <p><strong>Number of posts:</strong> <%= user.postCount %></p> <!-- Viser antall poster -->
-    <p> <!-- Starter rad for dato -->
-      <strong>Account made:</strong> <!-- Label for dato -->
-      <%= new Date(user.created_at) // Lager et Date-objekt fra ISO-strengen
-        .toLocaleDateString('nb-NO', { // Formaterer kun dato i norsk format
-          year: 'numeric', // Viser år med fire siffer
-          month: '2-digit', // Viser måned med to siffer
-          day: '2-digit' // Viser dag med to siffer
-        }) %> <!-- Slutt på EJS-uttrykk -->
-    </p> <!-- Slutter rad for dato -->
-</div> <!-- Slutter container for brukerinfo -->
+<div> <!-- Info-seksjon -->
+  <% if (typeof isOwnProfile !== 'undefined' && isOwnProfile) { %>     <!-- Viser bare "Username:" på min egen profil -->
+    <p><strong>Username:</strong> <%= user.username %></p>             <!-- Brukernavn-linje -->
+  <% } %>                                                              <!-- Slutt betinget visning -->
+  <p><strong>Number of posts:</strong> <%= user.postCount %></p>       <!-- Antall poster -->
+  <p>                                                                  <!-- Konto opprettet -->
+    <strong>Account made:</strong>
+    <%= new Date(user.created_at).toLocaleDateString('nb-NO', { year: 'numeric', month: '2-digit', day: '2-digit' }) %>
+  </p>
+</div>
 
-<button id="logoutBtn" type="button">Logout</button> <!-- En vanlig knapp (ikke form), som vi fanger i JS -->
+<% if (typeof isOwnProfile !== 'undefined' && isOwnProfile) { %>       <!-- Logout-knapp bare på min profil -->
+  <button id="logoutBtn" type="button">Logout</button>                 <!-- Knapp fanges av client.js -->
+  <button id="deleteUserBtn" type="button">Delete user</button>        <!-- Ny knapp: Slett bruker -->
+<% } %>
 
-<h2>My Posts</h2> <!-- Section title for your own posts -->
+<% if (typeof isOwnProfile !== 'undefined' && isOwnProfile) { %>
+  <h2>My Posts</h2>
+<% } else { %>
+  <h2><%= user.username %>'s Posts</h2>
+<% } %>
 
 <section class="posts-list"> <!-- Container for all your posts -->
   <% if (posts && posts.length) { %> <!-- If there are posts -->
@@ -38,7 +46,7 @@
             class="like-btn"                                                
             data-post-id="<%= post.PostID %>"                               
             aria-pressed="<%= post.liked ? 'true' : 'false' %>">            <!-- Accessibility state -->
-            <span class="like-label"><%= post.liked ? 'Unlike' : 'Like' %></span> <!-- Button label -->
+            <span class="like-label"><%= post.liked ? 'Unlike ❤️' : 'Like ❤️' %></span> <!-- Button label -->
             ( <span class="like-count"><%= post.likeCount %></span> )             <!-- Like counter -->
           </button> <!-- End like button -->
 

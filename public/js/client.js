@@ -24,6 +24,31 @@
       return; // Viktig: avslutt denne klikk-håndteringen her
     };  // Slutt Logout 
 
+    const delBtn = e.target.closest('#deleteUserBtn'); // Finner klikk på delete-knappen
+    if (delBtn) { // Hvis slett-knappen ble klikket
+      e.preventDefault(); // Hindrer evt. default oppførsel
+      const ok = confirm('Are you sure you want to delete your user? This cannot be undone.'); // Viser bekreftelse
+      if (!ok) return; // Hvis brukeren trykker "Cancel", avbryt
+
+      try { // Prøver å kalle API for å slette konto
+        const res = await fetch('/api/auth/delete-account', { // Kaller slett-konto API
+          method: 'POST', // Bruker POST
+          headers: { 'Content-Type': 'application/json' } // Header (ikke kritisk her)
+        }); // Slutt fetch
+        const data = await res.json(); // Leser JSON-svaret
+        if (!res.ok || !data.ok) { // Håndterer API-feil
+          alert(data.error || 'Could not delete account'); // Viser feilmelding
+          return; // Avbryt
+        } // Slutt feil-sjekk
+
+        window.location.href = '/'; // Ved suksess: gå til forsiden
+      } catch (err) { // Fanger nettverks-/uventede feil
+        console.error('Delete account error:', err); // Logger feilen
+        alert('Unexpected error'); // Viser enkel feilmelding
+      } // Slutt try/catch
+      return; // Avslutter håndteringen for dette klikket
+    } // Slutt delete user-gren
+
     const likeBtn = e.target.closest('.like-btn'); // Sjekker om like-knapp ble klikket
     if (likeBtn) { // Håndter like/unlike
       const postId = likeBtn.dataset.postId; // Leser PostID
@@ -33,7 +58,7 @@
         const data = await res.json(); // Leser JSON
         if (!res.ok || !data.ok) { alert(data.error || 'Could not update like'); return; } // API-feil
         likeBtn.setAttribute('aria-pressed', data.liked ? 'true' : 'false'); // Oppdater ARIA
-        const labelEl = likeBtn.querySelector('.like-label'); if (labelEl) labelEl.textContent = data.liked ? 'Unlike' : 'Like'; // Label
+        const labelEl = likeBtn.querySelector('.like-label'); if (labelEl) labelEl.textContent = data.liked ? 'Unlike ❤️' : 'Like ❤️'; // Label
         const countEl = likeBtn.querySelector('.like-count'); if (countEl) countEl.textContent = data.likes; // Teller
       } catch (err) { console.error('Like error:', err); alert('Unexpected error'); } // Feilhåndtering
       return; // Avslutt denne grenen

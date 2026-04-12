@@ -1,3 +1,10 @@
+/* Globalt: inkluder padding/border i elementets totale bredde/høyde */
+*,
+*::before,
+*::after {
+  box-sizing: border-box; /* Sikrer at 100% bredde ikke overskytes av padding/border */
+}
+
 /* Gjør hele siden til en fleksibel kolonne for sticky footer */
 html, body { /* Velger html og body */
   height: 100%; /* Lar body fylle hele høyden av vinduet */
@@ -27,8 +34,9 @@ main { /* Main-innholdet */
 
 /* Header øverst, litt ulik bakgrunnen */
 .site-header { /* Toppfeltet (header) */
-  background: #eaeaea; /* Litt mørkere grå enn body for å skille seg ut */
-  border-bottom: 1px solid #d6d6d6; /* Tynn linje under headeren */
+  background: #ededed; /* Litt lysere grå for ren look */
+  border-bottom: 1px solid #d9d9d9; /* Tynn linje under headeren */
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06); /* Svak skygge for dybde */
 } /* Slutt på .site-header */
 
 /* Enkel nav-layout i headeren */
@@ -40,80 +48,117 @@ main { /* Main-innholdet */
 } /* Slutt på .nav */
 
 .brand a { /* Lenken for “logo/brand” */
-  color: #222; /* Mørk tekst */
+  color: #1a1a1a; /* Litt mørkere tekst */
   text-decoration: none; /* Fjerner understrek */
   font-weight: bold; /* Fet skrift for å fremheve */
 } /* Slutt på .brand a */
 
+.brand a:hover { /* Hover for brand-lenke */
+  opacity: 0.85; /* Liten visuell respons */
+} /* Slutt på .brand a:hover */
+
 .links a { /* Meny-lenker på høyre side */
   color: #222; /* Mørk tekst */
-  text-decoration: none; /* Fjerner understrek */
+  text-decoration: none; /* Ingen understrek */
   margin-left: 12px; /* Litt avstand mellom lenkene */
+  padding: 6px 8px; /* Litt innvendig luft for bedre klikkflate */
+  border-radius: 8px; /* Runde hjørner gir mykere følelse */
+  transition: background 120ms ease; /* Myk overgang ved hover */
 } /* Slutt på .links a */
 
 .links a:hover { /* Hover-stil for lenkene */
-  text-decoration: underline; /* Enkelt hover-uttrykk: understrek lenken */
+  background: #e8e8e8; /* Lett bakgrunn på hover */
+  text-decoration: none; /* Behold uten understrek */
 } /* Slutt på .links a:hover */
 
 /* Footer nederst, litt annen farge enn header */
 .site-footer { /* Bunnfeltet (footer) */
-  background: #e0e0e0; /* Litt annerledes grå enn headeren for kontrast */
+  background: #e2e2e2; /* Litt annen grå for kontrast */
   border-top: 1px solid #cfcfcf; /* Tynn linje over footer */
+  box-shadow: 0 -1px 2px rgba(0,0,0,0.05); /* Svak skygge over */
 } /* Slutt på .site-footer */
 
 /* Enkle stiler for skjema på forsiden */
 form textarea { /* Tekstområde i skjema */
-  width: 100%; /* Fyller hele bredden av containeren */
-  min-height: 100px; /* Gir en enkel grunnhøyde */
-  padding: 8px; /* Litt innvendig luft */
-  border: 1px solid #ccc; /* Lys ramme rundt */
-  background: #fff; /* Hvit bakgrunn for kontrast */
-} /* Slutt på form textarea */
+  width: 100%;           /* Fyll hele bredden av containeren */
+  min-height: 100px;     /* Grunnhøyde (eller 140px hvis du bruker den) */
+  padding: 10px;         /* Innvendig luft */
+  border: 1px solid #cfcfcf; /* Lys ramme */
+  background: #fff;      /* Hvit bakgrunn */
+  border-radius: 10px;   /* Runde hjørner */
+  transition: border-color 140ms ease, box-shadow 140ms ease; /* Fokus-overgang */
+  display: block;        /* Fjern evt. inline-gap/artefakter */
+  box-sizing: border-box;/* Viktig: inkluder padding/border i 100% bredde */
+}
+
+form textarea:focus { /* Fokus-stil for textarea */
+  border-color: #0a66c2; /* Blå kant ved fokus */
+  box-shadow: 0 0 0 3px rgba(10,102,194,0.15); /* Blålig fokusglød */
+  outline: none; /* Fjern standard outline */
+} /* Slutt på form textarea:focus */
 
 form button { /* Send-knapp i skjema */
   margin-top: 8px; /* Litt avstand over knappen */
   padding: 8px 12px; /* Enkel klikkflate */
   border: 1px solid #bbb; /* Tynn ramme */
   background: #fff; /* Hvit bakgrunn */
+  border-radius: 8px; /* Runde hjørner */
   cursor: pointer; /* Pekehånd ved hover */
+  transition: background 120ms ease, transform 60ms ease; /* Hyggelig respons */
 } /* Slutt på form button */
 
 form button:hover { /* Hover-stil for knappen */
   background: #f7f7f7; /* Svakt skille ved hover */
 } /* Slutt på form button:hover */
 
-/* Liste over poster på forsiden */
-.posts-list { /* Beholder for alle postene */
-  display: grid; /* Grid for jevn avstand */
-  gap: 12px; /* Avstand mellom post-boksene */
-  margin-top: 16px; /* Luft over lista */
-} /* Slutt på .posts-list */
+form button:active { /* Aktiv/klikket */
+  transform: translateY(1px); /* Liten trykk-effekt */
+} /* Slutt på form button:active */
 
 .post-content { /* Text inside a post or comment */
   white-space: pre-line; /* Show line breaks from the textarea, but collapse extra spaces */
   overflow-wrap: anywhere; /* Break very long words/URLs to prevent horizontal overflow */
   word-break: break-word; /* Extra safety for long tokens */
+  line-height: 1.55; /* Litt luftigere linjeavstand for lesbarhet */
 } /* End .post-content */
 
-/* Én post-boks */
-.post-box { /* Boks som omslutter en enkelt post */
-  max-width: 100%;
-  text-overflow:clip;
-  background: #ffffff; /* Hvit boks som skiller seg fra grå bakgrunn */
-  border: 1px solid #ddd; /* Lys grå kantlinje */
-  padding: 12px; /* Litt innvendig luft */
-} /* Slutt på .post-box */
-
-textarea {
-  resize: none;
+/* Sørg for at post-lista har én kolonne som fyller hele bredden */
+.posts-list {
+  display: grid;             /* Behold grid */
+  gap: 16px;                 /* Avstand mellom kort */
+  margin-top: 16px;          /* Luft over lista */
+  grid-template-columns: 1fr;/* 1 kolonne som fyller hele container-bredden */
+  padding: 0;                /* Ingen innvendig padding som kan lage innrykk */
 }
+
+/* Fyll hele kolonnebredden, uten “spreng” */
+.post-box {
+  width: 100%;               /* Fyll hele grid-kolonnen */
+  max-width: 100%;           /* Ikke bredere enn kolonnen */
+  box-sizing: border-box;    /* NY: Inkluder padding/border i totalbredden */
+  text-overflow: clip;       /* Beholdt: standard tekst-overflyt */
+  background: #ffffff;       /* Beholdt: hvit boks */
+  border: 1px solid #dddddd; /* Beholdt: lys ramme */
+  padding: 14px;             /* Beholdt: innvendig luft */
+  border-radius: 10px;       /* Beholdt: avrundede hjørner */
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* Beholdt: subtil skygge */
+  transition: box-shadow 140ms ease, transform 80ms ease; /* Beholdt: hover-respons */
+} /* Slutt .post-box */
+
+.post-box:hover { /* Hover for post-boks */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08); /* Litt tydeligere skygge ved hover */
+} /* Slutt .post-box:hover */
+
+textarea { /* Alle textarea */
+  resize: none; /* Vi bruker auto-grow i JS */
+} /* Slutt textarea */
 
 /* ---------- ACTIONS ROW (LIKE + COMMENT COUNT) ---------- */
 .actions-row { /* Row holding the like button and the comment count */
   display: flex; /* Place items in a single row */
   align-items: center; /* Vertically center items */
-  gap: 12px; /* Space between items */
-  margin-top: 4px; /* Small space above the row */
+  gap: 14px; /* Litt mer mellomrom for å puste */
+  margin-top: 8px; /* Litt mer luft over raden */
 } /* End .actions-row */
 
 .comment-count { /* The number showing how many comments a post has */
@@ -121,9 +166,34 @@ textarea {
   color: #555; /* Subtle color to deemphasize */
 } /* End .comment-count */
 
+.comment-label { /* Labelen “Comments:” (klasse brukes allerede i HTML) */
+  font-size: 0.95em; /* Litt mindre for ikke å dominere */
+  color: #666; /* Dempet farge */
+} /* Slutt .comment-label */
+
+/* Style for like-knappen (klasse finnes allerede i HTML) */
+.like-btn { /* Knapp for like/unlike */
+  padding: 6px 10px; /* Klart klikkfelt */
+  border: 1px solid #cfcfcf; /* Lys kant */
+  background: #fff; /* Hvit bakgrunn */
+  border-radius: 8px; /* Runde hjørner */
+  cursor: pointer; /* Pekehånd */
+  transition: background 120ms ease, border-color 120ms ease; /* Myk hover/fokus */
+} /* Slutt .like-btn */
+
+.like-btn:hover { /* Hover for like-knapp */
+  background: #f6f6f6; /* Svak bakgrunnsendring */
+  border-color: #bebebe; /* Litt mørkere kant */
+} /* Slutt .like-btn:hover */
+
+.like-btn[aria-pressed="true"] { /* Når posten er liket */
+  background: #e8f1fb; /* Lys blålig bakgrunn */
+  border-color: #a8c8ef; /* Blå kant */
+} /* Slutt .like-btn[aria-pressed="true"] */
+
 /* ---------- INLINE COMMENT FORM ---------- */
 .comment-form-row { /* Row with the comment textarea and Send button */
-  margin-top: 8px; /* Space above the form */
+  margin-top: 10px; /* Litt mer luft over skjemaet */
   display: flex; /* Place textarea and button on one line */
   gap: 8px; /* Space between textarea and button */
   align-items: flex-start; /* Align tops so the textarea can grow downward */
@@ -136,29 +206,45 @@ textarea {
   padding: 8px; /* Inner padding for readability */
   border: 1px solid #ccc; /* Light border to match your form textarea */
   background: #fff; /* White background like other inputs */
+  border-radius: 8px; /* Runde hjørner */
   resize: none; /* We auto-grow with JS, so disable manual resize */
   overflow: hidden; /* Hide scrollbars; height grows via JS */
+  transition: border-color 140ms ease, box-shadow 140ms ease; /* Fokus-animasjon */
 } /* End .comment-input */
+
+.comment-input:focus { /* Fokus-stil */
+  border-color: #0a66c2; /* Blå kant ved fokus */
+  box-shadow: 0 0 0 3px rgba(10,102,194,0.15); /* Fokusglød */
+  outline: none; /* Fjern default outline */
+} /* Slutt .comment-input:focus */
 
 .comment-send { /* The Send button next to the comment input */
   padding: 8px 12px; /* Clickable area */
   border: 1px solid #bbb; /* Thin border like your form button */
   background: #fff; /* White background for consistency */
+  border-radius: 8px; /* Runde hjørner */
   cursor: pointer; /* Pointer cursor on hover */
+  transition: background 120ms ease, transform 60ms ease; /* Responsiv */
 } /* End .comment-send */
 
 .comment-send:hover { /* Hover effect for the Send button */
   background: #f7f7f7; /* Subtle hover color, like your form button */
 } /* End .comment-send:hover */
 
+.comment-send:active { /* Aktiv */
+  transform: translateY(1px); /* Liten trykk-effekt */
+} /* Slutt .comment-send:active */
+
 /* ---------- COMMENTS LIST ---------- */
 .comment-list { /* Container for all comments under a post */
-  margin-top: 8px; /* Space above the comment list */
+  margin-top: 10px; /* Litt mer luft over kommentarliste */
+  border-top: 1px solid #eee; /* Tynn delestrek for struktur */
+  padding-top: 8px; /* Litt luft over første kommentar */
 } /* End .comment-list */
 
 .comment { /* One comment block */
   font-size: 0.95em; /* Slightly smaller than the post text */
-  opacity: 0.95; /* Subtle visual separation */
+  opacity: 0.98; /* Svak justering for visuell separasjon */
   margin: 6px 0; /* Space between comments */
 } /* End .comment */
 
@@ -166,10 +252,12 @@ textarea {
   margin: 0; /* Remove default paragraph margin */
 } /* End .comment-header */
 
+/* Utility: skjul elementer */
 .hidden { /* Utility class that hides an element */
   display: none; /* Hides the element from layout */
-}
+} /* Slutt .hidden */
 
+/* Toggle-lenke for kommentarer */
 .comments-toggle { /* Makes the comments toggle look like a link */
   background: none; /* No background */
   border: 0; /* No border */
@@ -178,7 +266,7 @@ textarea {
   text-decoration: underline; /* Underlined text */
   cursor: pointer; /* Pointer cursor on hover */
   font: inherit; /* Inherit font from parent */
-}
+} /* Slutt .comments-toggle */
 
 /* Toolbar for feed-sortering */
 .feed-toolbar { /* Vannrett linje med lenker for sortering */
@@ -186,18 +274,36 @@ textarea {
   align-items: center; /* Sentrer vertikalt */
   gap: 12px; /* Avstand mellom lenkene */
   margin-bottom: 12px; /* Litt luft før post-lista */
-}
+  background: #efefef; /* Lys flate for å skille verktøylinjen */
+  border: 1px solid #e2e2e2; /* Tynn ramme */
+  padding: 6px 10px; /* Innvendig luft */
+  border-radius: 8px; /* Runde hjørner */
+} /* Slutt .feed-toolbar */
 
 /* Lenker for sortering */
 .feed-link { /* Grunnstil for sorteringslenker */
   color: #0a66c2; /* Link-lignende farge */
   text-decoration: none; /* Ingen understrek */
   cursor: pointer; /* Pekehånd */
-}
+  padding: 2px 6px; /* Litt innvendig luft */
+  border-radius: 6px; /* Runde hjørner */
+  transition: background 120ms ease; /* Myk hover */
+} /* Slutt .feed-link */
+
+.feed-link:hover { /* Hover for sorteringslenker */
+  background: #e7f0fb; /* Lys blålig bakgrunn */
+} /* Slutt .feed-link:hover */
 
 /* Aktiv lenke (markerer valgt sort) */
 .feed-link.active { /* Når denne vises, er sorteringen aktiv */
   font-weight: bold; /* Fet skrift */
   text-decoration: underline; /* Understrek for å markere aktiv */
-}
+  background: #dfeaf9; /* Svak markering i bakgrunn */
+} /* Slutt .feed-link.active */
 
+/* Enkel pagineringscontainer for kommentar-knapper (klasse finnes i HTML) */
+.comments-pagination { /* Holder “Show more/less” under kommentarer */
+  margin-top: 6px; /* Litt luft over knappene */
+  display: flex; /* Legg knappene på rekke */
+  gap: 10px; /* Litt avstand mellom knappene */
+} /* Slutt .comments-pagination */

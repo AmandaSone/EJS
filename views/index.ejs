@@ -25,7 +25,7 @@
   <% posts.forEach(post => { %> <!-- Loop over each top-level post -->
     <article class="post-box"> <!-- One post “card/box” -->
       <p> <!-- Header line: author + time -->
-        <strong><%= post.username %></strong> <!-- Author username -->
+        <strong><a href="/u/<%= encodeURIComponent(post.username) %>"><%= post.username %></a></strong> <!-- Klikkbar lenke til offentlig profil -->
         • <!-- Separator -->
         <%= typeof formatPostTime === 'function' 
               ? formatPostTime(post.created_at) 
@@ -40,7 +40,7 @@
           class="like-btn"                                                
           data-post-id="<%= post.PostID %>"                               
           aria-pressed="<%= post.liked ? 'true' : 'false' %>">            <!-- Accessibility state -->
-          <span class="like-label"><%= post.liked ? 'Unlike' : 'Like' %></span> <!-- Button label -->
+          <span class="like-label"><%= post.liked ? 'Unlike ❤️' : 'Like ❤️' %></span> <!-- Button label -->
           ( <span class="like-count"><%= post.likeCount %></span> )             <!-- Like counter -->
         </button> <!-- End like button -->
 
@@ -82,7 +82,7 @@
           <% comments.forEach((c, i) => { %> <!-- Løkke med indeks for å styre synlighet -->
             <div class="comment <%= i >= 5 ? 'hidden' : '' %>" data-idx="<%= i %>"> <!-- Skjuler kommentarer utover de første 5 -->
               <p class="comment-header"> <!-- Header med forfatter + tidspunkt -->
-                <strong><%= c.username %></strong> • 
+                <strong><a href="/u/<%= encodeURIComponent(c.username) %>"><%= c.username %></a></strong> <!-- Klikkbar forfatter i kommentar --> • 
                 <%= typeof formatPostTime === 'function' 
                       ? formatPostTime(c.created_at) 
                       : (c.created_at ? new Date(c.created_at).toLocaleString('nb-NO') : 'Ukjent tidspunkt') %>
