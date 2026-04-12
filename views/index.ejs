@@ -1,13 +1,25 @@
-<%- include('partials/header', { title: "Latest Posts" }) %> <!-- Inkluderer header-partial med tittel -->
+<%- include('partials/header', { title: "Home Page" }) %> <!-- Inkluderer header-partial med tittel -->
 
-<h1>Latest Posts</h1> <!-- Overskrift for siden -->
+<h1>What's on you mind?</h1> <!-- Overskrift for siden -->
 
 <form action="/add-post" method="POST"> <!-- Skjema for å legge til ny post -->
     <textarea class="textarea" name="content" placeholder="Write something..." required></textarea> <!-- Tekstfelt for innhold -->
     <br> <!-- Enkel linjeskift -->
     <button type="submit">Post</button> <!-- Knapp for å sende inn posten -->
 </form> <!-- Slutt på skjema -->
+<br><br>
 
+<!-- Toolbar over post-lista -->
+<div class="feed-toolbar"> <!-- En rad for sorteringsvalg -->
+  <a href="/?sort=latest"
+    class="feed-link <%= (typeof currentSort !== 'undefined' && currentSort === 'latest') ? 'active' : '' %>">
+    Latest
+  </a>
+  <a href="/?sort=trending"
+    class="feed-link <%= (typeof currentSort !== 'undefined' && currentSort === 'trending') ? 'active' : '' %>">
+    Trending
+  </a>
+</div>
 
 <section class="posts-list"> <!-- Container for all top-level posts -->
   <% posts.forEach(post => { %> <!-- Loop over each top-level post -->
@@ -32,8 +44,9 @@
           ( <span class="like-count"><%= post.likeCount %></span> )             <!-- Like counter -->
         </button> <!-- End like button -->
 
+        <span class="comment-label">Comments:</span>  <!-- Label for comments count -->
         <span class="comment-count" data-parent-id="<%= post.PostID %>"> <!-- Shows current number of comments -->
-          <p class="comment-count-label">Comments: <%= post.commentCount %></p> <!-- Comment count -->
+          <%= post.commentCount %> <!-- Server rendered Comment count -->
         </span> <!-- End comments count -->
 
         <% if (post.commentCount > 0) { %> <!-- Only show toggle if there are comments -->
@@ -61,7 +74,7 @@
           </button> <!-- End send button -->
         </div> <!-- End comment form row -->
       <% } else { %> <!-- If user is logged out -->
-        <small> Log in to comment</small> <!-- Hint for guests -->
+        <small><br>Log in to comment</small> <!-- Hint for guests -->
       <% } %> <!-- End login check -->
 
       <div class="comment-list hidden" data-parent-id="<%= post.PostID %>" data-visible-count="<%= Math.min(5, (commentsByParent[post.PostID] || []).length) %>"> <!-- Skjult ved start; lagrer synlig-antall -->

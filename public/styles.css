@@ -180,3 +180,24 @@ textarea {
   font: inherit; /* Inherit font from parent */
 }
 
+/* Toolbar for feed-sortering */
+.feed-toolbar { /* Vannrett linje med lenker for sortering */
+  display: flex; /* Plasser elementer på rekke */
+  align-items: center; /* Sentrer vertikalt */
+  gap: 12px; /* Avstand mellom lenkene */
+  margin-bottom: 12px; /* Litt luft før post-lista */
+}
+
+/* Lenker for sortering */
+.feed-link { /* Grunnstil for sorteringslenker */
+  color: #0a66c2; /* Link-lignende farge */
+  text-decoration: none; /* Ingen understrek */
+  cursor: pointer; /* Pekehånd */
+}
+
+/* Aktiv lenke (markerer valgt sort) */
+.feed-link.active { /* Når denne vises, er sorteringen aktiv */
+  font-weight: bold; /* Fet skrift */
+  text-decoration: underline; /* Understrek for å markere aktiv */
+}
+

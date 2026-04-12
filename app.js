@@ -36,6 +36,15 @@ app.use(session({ // Setter opp sesjonshåndtering for innlogging
 //----------------------//
 app.use((req, res, next) => { // Middleware som kjører for alle requests
   res.locals.title = "Min app"; // Setter en standardtittel tilgjengelig i alle EJS-views (kan overstyres i res.render)
+
+  // Nye defaults for sort/filter — brukes av index.ejs toolbaren
+  if (typeof res.locals.currentSort === 'undefined') {
+    res.locals.currentSort = 'latest';          // Standard sortering
+  }
+  if (typeof res.locals.currentFilter === 'undefined') {
+    res.locals.currentFilter = 'all';           // Standard filter (forberedt for 'following')
+  }
+
   next(); // Går videre til neste middleware/route
 }); // Slutt på default locals
 
@@ -93,87 +102,112 @@ function requireApiLogin(req, res, next) { // Middleware for å beskytte API-end
 //----------------------//
 //  HTML ROUTES (EJS)   //
 //----------------------//
-app.get("/", (req, res) => { // Defines GET / for the homepage
-  const viewerId = req.session.userId || -1; // Reads current viewer’s userId or -1 if logged out
+app.get("/", (req, res) => { // Definerer GET / som hovedfeed
+  const viewerId = req.session.userId || -1; // Leser innlogget bruker-ID, eller -1 hvis utlogget (match’er ingen like-rader)
+  const sort = (req.query.sort || "latest").toLowerCase(); // Leser sorteringsvalg fra URL (?sort=...), default 'latest'
+  const filter = (req.query.filter || "all").toLowerCase(); // Leser filter (?filter=...), default 'all' (for fremtidig "following")
 
-  const postsSql = `                     -- SQL to fetch top-level posts with likeCount, liked and commentCount
+  // Hvitliste gyldige verdier slik at vi ikke bruker user input direkte i ORDER BY
+  const validSorts = new Set(["latest", "trending"]); // Gyldige sort-verdier
+  const chosenSort = validSorts.has(sort) ? sort : "latest"; // Hvis ugyldig: bruk 'latest'
+
+  const validFilters = new Set(["all", "following"]); // Gyldige filter (forberedt for framtidig bruk)
+  const chosenFilter = validFilters.has(filter) ? filter : "all"; // Hvis ugyldig: bruk 'all'
+
+  console.log('HOME sort:', req.query.sort, 'chosenSort:', chosenSort); // Hjelper å verifisere at chosenSort settes
+  
+  // Bygg WHERE-klausul for toppnivå-innlegg (ParentPostID IS NULL) og ev. "following"
+  let whereClause = "p.ParentPostID IS NULL"; // Viser bare toppnivå-innlegg i feeden
+  const params = []; // Parametre som skal inn i SQL
+  // Merk: Vi legger viewerId til egen param-liste for liked-sjekk nedenfor, så vi gjør to ting: liked-join + where/params
+
+  // ORDER BY avhenger av valgt sortering
+  const orderBy =
+    chosenSort === "trending"
+      ? "(likeCount + commentCount) DESC, p.created_at DESC" // Trending: sorter på sum likes+kommentarer, tie-break på nyeste først
+      : "p.created_at DESC"; // Latest: nyeste først
+
+  // SQL for å hente toppnivå-innlegg med likeCount, commentCount og liked (for viewer)
+  const postsSql = `
     SELECT
-      p.PostID,                           -- Post id
-      p.content,                          -- Post content
-      p.created_at,                       -- Timestamp for the post
-      u.username,                         -- Author username
-      (SELECT COUNT(*) 
-        FROM PostLike pl 
-        WHERE pl.PostID = p.PostID) AS likeCount,       -- Number of likes for this post
-      (SELECT COUNT(*) 
-        FROM Post c 
-        WHERE c.ParentPostID = p.PostID) AS commentCount, -- Number of direct comments for this post
-      CASE WHEN l.UserID IS NULL THEN 0 ELSE 1 END AS liked -- 1 if current viewer liked this post
-    FROM Post AS p
-    JOIN User AS u 
-      ON u.UserID = p.UserID
-    LEFT JOIN PostLike AS l 
-      ON l.PostID = p.PostID AND l.UserID = ?           -- Checks if current viewer liked
-    WHERE p.ParentPostID IS NULL                         -- Only top-level posts (not comments)
-    ORDER BY p.PostID DESC                               -- Newest first
-  `; // End SQL
+      p.PostID,                                                        -- Postens ID
+      p.content,                                                       -- Innholdet i posten
+      p.created_at,                                                    -- Når posten ble laget
+      u.username,                                                      -- Forfatterens brukernavn
+      (SELECT COUNT(*) FROM PostLike pl WHERE pl.PostID = p.PostID) AS likeCount,    -- Antall likes
+      (SELECT COUNT(*) FROM Post c WHERE c.ParentPostID = p.PostID)   AS commentCount, -- Antall kommentarer
+      CASE WHEN l.UserID IS NULL THEN 0 ELSE 1 END AS liked           -- Om viewer har liket (1/0)
+    FROM Post AS p                                                     -- Leser fra Post-tabellen
+    JOIN User AS u ON u.UserID = p.UserID                              -- Joiner for å hente forfatterens navn
+    LEFT JOIN PostLike AS l                                            -- Venstrejoin for å sjekke om viewer har liket
+      ON l.PostID = p.PostID AND l.UserID = ?                          -- Må matche både PostID og viewerId
+    WHERE ${whereClause}                                               -- Bruk den dynamiske WHERE-klausulen
+    ORDER BY ${orderBy}                                                -- Bruk valgt sortering
+  `; // Slutt SQL for innlegg
 
-  db.all(postsSql, [viewerId], (err, topPosts) => { // Runs the query and returns an array of posts
-    if (err) { // Checks for DB error
-      console.error("SQL error in GET / (posts):", err.message); // Logs details for debugging
-      return res.status(500).send("Databasefeil"); // Sends generic 500 to client
-    } // End error handling
+  // Bygg parametere til postsSql: viewerId må være første param (for liked-join), deretter ev. filter-parametre
+  const postParams = [viewerId, ...params]; // Setter viewerId først (for LEFT JOIN), så filterparametre (om noen)
 
-    if (topPosts.length === 0) { // If there are no top-level posts
-      return res.render("index", { // Render immediately with empty posts
-        posts: [], // No posts
-        commentsByParent: {}, // No comments
-        title: "Home", // Page title
-        userId: req.session.userId || null // Viewer
-      }); // End render
-    } // End no-posts branch
+  db.all(postsSql, postParams, (err, topPosts) => { // Kjører spørringen for å hente innlegg
+    if (err) { // Feilhåndtering for DB
+      console.error("SQL-feil i GET / (posts):", err.message); // Logger detaljert feil
+      return res.status(500).send("Databasefeil"); // Sender 500 ved feil
+    } // Slutt feil-sjekk
 
-    const parentIds = topPosts.map(p => p.PostID); // Collects all top-level PostIDs to fetch their comments
-    const placeholders = parentIds.map(() => "?").join(","); // Builds (?, ?, ?) placeholder string for IN clause
+    if (topPosts.length === 0) { // Hvis ingen innlegg
+      return res.render("index", { // Renderer index med tom liste
+        posts: [], // Ingen innlegg
+        commentsByParent: {}, // Ingen kommentarer
+        title: "Home", // Side-tittel
+        userId: req.session.userId || null, // Viewer ID for UI
+        currentSort: chosenSort, // Sender valgt sortering tilbake til view
+        currentFilter: chosenFilter // Sender valgt filter tilbake til view
+      }); // Slutt render
+    } // Slutt tomt tilfelle
 
-    const commentsSql = `                 -- SQL to fetch comments for all top-level posts in one go
+    // Hent kommentarer til alle disse toppnivå-innleggene i ett kall
+    const parentIds = topPosts.map(p => p.PostID); // Samler post-id-ene
+    const placeholders = parentIds.map(() => "?").join(","); // Lager (?, ?, ?) til IN-klausul
+
+    const commentsSql = `
       SELECT
-        c.PostID,                         -- Comment id (also a PostID)
-        c.ParentPostID,                   -- The parent post this comment belongs to
-        c.content,                        -- Comment text
-        c.created_at,                     -- Timestamp for the comment
-        u.username                        -- Comment author username
-      FROM Post AS c
-      JOIN User AS u 
-        ON u.UserID = c.UserID
-      WHERE c.ParentPostID IN (${placeholders})       -- Only comments for the loaded top-level posts
-      ORDER BY c.created_at ASC                       -- Oldest → newest for natural reading order
-    `; // End SQL
+        c.PostID,                             -- Kommentarens ID (også PostID)
+        c.ParentPostID,                       -- Hvilken toppnivå-post den hører til
+        c.content,                            -- Kommentar-tekst
+        c.created_at,                         -- Tidsstempel
+        u.username                            -- Forfatterens brukernavn
+      FROM Post AS c                          -- Kommentarer er rader i Post med ParentPostID satt
+      JOIN User AS u ON u.UserID = c.UserID   -- Join for forfatter
+      WHERE c.ParentPostID IN (${placeholders}) -- Kun kommentarer til disse postene
+      ORDER BY c.created_at ASC               -- Eldst → nyest for naturlig leserekkefølge
+    `; // Slutt SQL kommentarer
 
-    db.all(commentsSql, parentIds, (err2, comments) => { // Runs query for all comments
-      if (err2) { // DB error on comments
-        console.error("SQL error in GET / (comments):", err2.message); // Logs details
-        return res.status(500).send("Databasefeil"); // Sends 500
-      } // End error handling
+    db.all(commentsSql, parentIds, (err2, comments) => { // Kjører kommentarsøk
+      if (err2) { // Feilhåndtering DB
+        console.error("SQL-feil i GET / (comments):", err2.message); // Logger feil
+        return res.status(500).send("Databasefeil"); // Sender 500 ved feil
+      } // Slutt feil-sjekk
 
-      // Group comments by ParentPostID so EJS can do commentsByParent[postId]
-      const commentsByParent = {}; // Initializes grouping object
-      for (const c of comments) { // Loops all comments
-        const pid = c.ParentPostID; // Reads parent id
-        if (!commentsByParent[pid]) commentsByParent[pid] = []; // Creates array if missing
-        commentsByParent[pid].push(c); // Pushes comment into its parent’s list
-      } // End grouping loop
+      // Grupper kommentarer per ParentPostID så EJS enkelt kan hente commentsByParent[postId]
+      const commentsByParent = {}; // Oppslagsobjekt: parentId -> liste av kommentarer
+      for (const c of comments) { // Løkke over alle kommentarer
+        const pid = c.ParentPostID; // Leser parent-id
+        if (!commentsByParent[pid]) commentsByParent[pid] = []; // Opprett liste hvis den ikke finnes
+        commentsByParent[pid].push(c); // Legg kommentaren i riktig liste
+      } // Slutt grouping-løkke
 
-      // Render the view with posts and grouped comments
-      res.render("index", { // Renders index.ejs
-        posts: topPosts, // Top-level posts with counts and liked flag
-        commentsByParent, // Object mapping parentId -> array of comments
-        title: "Home", // Page title
-        userId: req.session.userId || null // Viewer user id for UI logic
-      }); // End render
-    }); // End db.all(comments)
-  }); // End db.all(posts)
-}); // End GET /
+      // Render index.ejs med alt som trengs
+      res.render("index", { // Renderer view
+        posts: topPosts, // Innleggsliste (allerede sortert etter valgt strategi)
+        commentsByParent, // Kommentarer gruppert per post
+        title: "Home", // Side-tittel
+        userId: req.session.userId || null, // Viewer
+        currentSort: chosenSort, // ‘latest’ eller ‘trending’ (for UI-markering)
+        currentFilter: chosenFilter // ‘all’ eller ‘following’ (for fremtidig bruk)
+      }); // Slutt render
+    }); // Slutt db.all (kommentarer)
+  }); // Slutt db.all (innlegg)
+}); // Slutt GET /
 
 app.get("/signup", (req, res) => { // Registreringsside (viser skjema)
   res.render("signup", { title: "Registrer deg" }); // Renderer signup.ejs med tittel

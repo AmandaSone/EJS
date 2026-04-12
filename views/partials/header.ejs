@@ -3,7 +3,7 @@
 <head> <!-- Starter head -->
     <meta charset="UTF-8"> <!-- Tegnsett UTF-8 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Responsiv visning -->
-    <title><%= (typeof title !== 'undefined' && title) ? title : 'Min app' %></title> <!-- Bruker side-tittel eller fallback -->
+    <title><%= (typeof title !== 'undefined' && title) ? title : 'Sharing Thoughts' %></title> <!-- Bruker side-tittel eller fallback -->
     <link rel="stylesheet" href="/styles.css"> <!-- Laster minimal CSS fra /public/styles.css -->
     <script src="/js/client.js" defer></script> <!-- Laster felles klientscript fra /public/js/client.js etter HTML-en er lastet -->
 </head> <!-- Slutt head -->
@@ -13,11 +13,10 @@
     <div class="container"> <!-- Sentrert container for header -->
         <nav class="nav"> <!-- Navigasjonsrad -->
         <div class="brand"> <!-- Område for “logo/brand” -->
-            <a href="/">Min app</a> <!-- Enkel hjem-lenke med navn -->
+            <a href="/">Sharing Thoughts</a> <!-- Enkel hjem-lenke med navn -->
         </div> <!-- Slutt brand -->
         <div class="links"> <!-- Område for nav-lenker -->
             <a href="/">Latest</a> <!-- Lenke til forsiden -->
-            <a href="/trending">Trending</a>
             <% if (typeof userId !== 'undefined' && userId) { %>
                 <a href="/profile">Profile</a> <!-- Lenke til profil -->
                 <a href="/logout">Logout</a> <!-- Logg ut -->

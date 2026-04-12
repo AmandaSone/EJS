@@ -1,12 +1,12 @@
-<%- include('partials/header', { title: "Profil" }) %> <!-- Inkluderer header-partial med tittel -->
+<%- include('partials/header', { title: "Profile" }) %> <!-- Inkluderer header-partial med tittel -->
 
-<h1>Min profil</h1> <!-- Overskrift for profilsiden -->
+<h1>My Profile</h1> <!-- Overskrift for profilsiden -->
 
 <div> <!-- Starter en container for brukerinfo -->
-    <p><strong>Brukernavn:</strong> <%= user.username %></p> <!-- Viser brukernavn -->
-    <p><strong>Antall poster:</strong> <%= user.postCount %></p> <!-- Viser antall poster -->
+    <p><strong>Username:</strong> <%= user.username %></p> <!-- Viser brukernavn -->
+    <p><strong>Number of posts:</strong> <%= user.postCount %></p> <!-- Viser antall poster -->
     <p> <!-- Starter rad for dato -->
-      <strong>Konto opprettet:</strong> <!-- Label for dato -->
+      <strong>Account made:</strong> <!-- Label for dato -->
       <%= new Date(user.created_at) // Lager et Date-objekt fra ISO-strengen
         .toLocaleDateString('nb-NO', { // Formaterer kun dato i norsk format
           year: 'numeric', // Viser år med fire siffer
@@ -18,7 +18,7 @@
 
 <button id="logoutBtn" type="button">Logout</button> <!-- En vanlig knapp (ikke form), som vi fanger i JS -->
 
-<h2>Mine innlegg</h2> <!-- Section title for your own posts -->
+<h2>My Posts</h2> <!-- Section title for your own posts -->
 
 <section class="posts-list"> <!-- Container for all your posts -->
   <% if (posts && posts.length) { %> <!-- If there are posts -->
@@ -42,9 +42,10 @@
             ( <span class="like-count"><%= post.likeCount %></span> )             <!-- Like counter -->
           </button> <!-- End like button -->
 
-          <span class="comment-count" data-parent-id="<%= post.PostID %>"> <!-- Current number of comments -->
-            <p class="comment-count-label">Comments: <%= post.commentCount %></p> <!-- Comment count -->
-          </span> <!-- End comment count -->
+          <span class="comment-label">Comments:</span>  <!-- Label for comments count -->
+          <span class="comment-count" data-parent-id="<%= post.PostID %>"> <!-- Shows current number of comments -->
+            <%= post.commentCount %> <!-- Server rendered Comment count -->
+          </span> <!-- End comments count -->
 
           <% if (post.commentCount > 0) { %> <!-- Only show toggle if there are comments -->
             <button
